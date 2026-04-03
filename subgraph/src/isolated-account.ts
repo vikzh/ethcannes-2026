@@ -6,21 +6,21 @@ import {
   PolicyHookSet as PolicyHookSetEvent,
 } from "../generated/templates/IsolatedAccount/IsolatedAccount";
 import { Account, ExecutionCall, ExecutionEnvelope } from "../generated/schema";
-import { Bytes } from "@graphprotocol/graph-ts";
+import { Address, BigInt, Bytes } from "@graphprotocol/graph-ts";
 
 function getOrCreateAccount(accountId: string, owner: Address): Account {
   let account = Account.load(accountId);
   if (account == null) {
     account = new Account(accountId);
     account.owner = owner;
-    account.deployedAtBlock = BigInt.zero();
-    account.deployedAtTimestamp = BigInt.zero();
+    account.deployedAtBlock = BigInt.fromI32(0);
+    account.deployedAtTimestamp = BigInt.fromI32(0);
     account.deployedTxHash = Bytes.empty();
     account.createdBy = owner;
-    account.updatedAtBlock = BigInt.zero();
-    account.updatedAtTimestamp = BigInt.zero();
+    account.updatedAtBlock = BigInt.fromI32(0);
+    account.updatedAtTimestamp = BigInt.fromI32(0);
   }
-  return account;
+  return account as Account;
 }
 
 export function handleOwnershipTransferred(event: OwnershipTransferredEvent): void {

@@ -1,4 +1,4 @@
-type Account @entity {
+type Account @entity(immutable: false) {
   id: ID!
   owner: Bytes!
   policyHook: Bytes
@@ -11,7 +11,7 @@ type Account @entity {
   updatedAtTimestamp: BigInt!
 }
 
-type ExecutionEnvelope @entity {
+type ExecutionEnvelope @entity(immutable: true) {
   id: ID!
   account: Bytes!
   signer: Bytes!
@@ -27,7 +27,7 @@ type ExecutionEnvelope @entity {
   txHash: Bytes!
 }
 
-type ExecutionCall @entity {
+type ExecutionCall @entity(immutable: true) {
   id: ID!
   account: Bytes!
   target: Bytes!
@@ -41,7 +41,7 @@ type ExecutionCall @entity {
   txHash: Bytes!
 }
 
-type WhitelistRequest @entity {
+type WhitelistRequest @entity(immutable: false) {
   id: ID!
   account: Bytes!
   requestId: BigInt!
