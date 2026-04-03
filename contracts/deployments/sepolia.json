@@ -1,0 +1,28 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployer": "0x0A1d00262B98027581C08641E1233D9B0Bc5D10C",
+  "deployedAt": "2026-04-03T23:00:36.795Z",
+  "contracts": {
+    "PolicyHook": {
+      "address": "0x02E2809c163a8288bc048f845Fd374f902Ab4d2C",
+      "deploymentBlock": 10584565
+    },
+    "AgentSessionValidator": {
+      "address": "0xEE9e141ec9f3a3D9Fb2C732882CA2eEDD0eC530B",
+      "deploymentBlock": 10584566
+    },
+    "WhitelistRequestModule": {
+      "address": "0x91Bd09CE180552eb28E04B026fE10158A565aCe0",
+      "deploymentBlock": 10584567
+    },
+    "EmergencyControls": {
+      "address": "0x31b302693BFd409d6259fe03AcF08491d6fE69f8",
+      "deploymentBlock": 10584568
+    },
+    "AbstractAccountFactory": {
+      "address": "0xD2d478f45642B1cb87Ed70C7feF7BE714f833932",
+      "deploymentBlock": 10584569
+    }
+  }
+}

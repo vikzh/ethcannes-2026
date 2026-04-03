@@ -1,0 +1,127 @@
+import { ethers, network } from "hardhat";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
+type DeploymentRecord = {
+  contracts: Record<string, { address: string; deploymentBlock: number }>;
+};
+
+function parseBool(value: string | undefined, fallback: boolean): boolean {
+  if (value == null) return fallback;
+  return value.toLowerCase() === "true";
+}
+
+function requireAddress(value: string, name: string): string {
+  if (!ethers.isAddress(value)) {
+    throw new Error(`Invalid ${name}: ${value}`);
+  }
+  return value;
+}
+
+function resolveSalt(rawSalt: string | undefined): string {
+  if (!rawSalt || rawSalt.trim() === "") {
+    return ethers.keccak256(ethers.toUtf8Bytes(`wallet-${Date.now()}`));
+  }
+  const s = rawSalt.trim();
+  if (ethers.isHexString(s, 32)) return s;
+  return ethers.keccak256(ethers.toUtf8Bytes(s));
+}
+
+async function loadDeploymentRecord(): Promise<DeploymentRecord> {
+  const deploymentPath = path.resolve(process.cwd(), "deployments", "sepolia.json");
+  const raw = await readFile(deploymentPath, "utf8");
+  return JSON.parse(raw) as DeploymentRecord;
+}
+
+async function main() {
+  if (network.name !== "sepolia") {
+    throw new Error(`This script is intended for sepolia, got: ${network.name}`);
+  }
+
+  const [owner] = await ethers.getSigners();
+  const ownerAddress = await owner.getAddress();
+  const deployments = await loadDeploymentRecord();
+
+  const policyHookAddress = requireAddress(
+    process.env.POLICY_HOOK_ADDRESS || deployments.contracts.PolicyHook.address,
+    "POLICY_HOOK_ADDRESS"
+  );
+  const factoryAddress = requireAddress(
+    process.env.FACTORY_ADDRESS || deployments.contracts.AbstractAccountFactory.address,
+    "FACTORY_ADDRESS"
+  );
+  const whitelistModuleAddress = requireAddress(
+    process.env.WHITELIST_MODULE_ADDRESS || deployments.contracts.WhitelistRequestModule.address,
+    "WHITELIST_MODULE_ADDRESS"
+  );
+  const emergencyControlsAddress = requireAddress(
+    process.env.EMERGENCY_CONTROLS_ADDRESS || deployments.contracts.EmergencyControls.address,
+    "EMERGENCY_CONTROLS_ADDRESS"
+  );
+  const agentSessionValidatorAddress = requireAddress(
+    process.env.AGENT_SESSION_VALIDATOR_ADDRESS || deployments.contracts.AgentSessionValidator.address,
+    "AGENT_SESSION_VALIDATOR_ADDRESS"
+  );
+
+  const installWhitelist = parseBool(process.env.INSTALL_WHITELIST_MODULE, true);
+  const installEmergency = parseBool(process.env.INSTALL_EMERGENCY_CONTROLS, true);
+  const installAgentValidator = parseBool(process.env.INSTALL_AGENT_SESSION_VALIDATOR, true);
+  const rawAgentAddress = process.env.AGENT_ADDRESS || ownerAddress;
+  const agentAddress = requireAddress(rawAgentAddress, "AGENT_ADDRESS");
+  const validAfter = BigInt(process.env.AGENT_VALID_AFTER || "0");
+  const validUntil = BigInt(process.env.AGENT_VALID_UNTIL || "0");
+
+  const salt = resolveSalt(process.env.WALLET_SALT);
+
+  const factory = await ethers.getContractAt("AbstractAccountFactory", factoryAddress, owner);
+  const predicted = await factory.predictAccountAddress(salt, policyHookAddress);
+  const existingCode = await ethers.provider.getCode(predicted);
+  if (existingCode !== "0x") {
+    throw new Error(`Predicted account already deployed at ${predicted}. Use a different WALLET_SALT.`);
+  }
+
+  const modules: Array<{ module: string; initData: string }> = [];
+  modules.push({ module: policyHookAddress, initData: "0x" });
+
+  if (installWhitelist) {
+    modules.push({ module: whitelistModuleAddress, initData: "0x" });
+  }
+  if (installEmergency) {
+    modules.push({ module: emergencyControlsAddress, initData: "0x" });
+  }
+  if (installAgentValidator) {
+    const initData = ethers.AbiCoder.defaultAbiCoder().encode(
+      ["address", "uint48", "uint48"],
+      [agentAddress, validAfter, validUntil]
+    );
+    modules.push({ module: agentSessionValidatorAddress, initData });
+  }
+
+  console.log("Creating wallet with:");
+  console.log(`- owner: ${ownerAddress}`);
+  console.log(`- factory: ${factoryAddress}`);
+  console.log(`- policyHook: ${policyHookAddress}`);
+  console.log(`- salt: ${salt}`);
+  console.log(`- predicted account: ${predicted}`);
+  console.log(`- modules count: ${modules.length}`);
+
+  const tx = await factory.deployAccount(salt, policyHookAddress, modules);
+  const receipt = await tx.wait();
+  if (!receipt) throw new Error("Missing deployment tx receipt");
+
+  const account = await ethers.getContractAt("IsolatedAccount", predicted, owner);
+  if (installAgentValidator) {
+    const setTx = await account.setAgentSessionValidator(agentSessionValidatorAddress);
+    await setTx.wait();
+  }
+
+  console.log("Wallet created successfully:");
+  console.log(`- account: ${predicted}`);
+  console.log(`- txHash: ${receipt.hash}`);
+  console.log(`- block: ${receipt.blockNumber}`);
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

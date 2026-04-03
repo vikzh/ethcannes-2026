@@ -1,9 +1,15 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+import "dotenv/config";
 
 const sepoliaRpcUrl = process.env.SEPOLIA_RPC_URL || "";
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
-const sepoliaAccounts = deployerPrivateKey ? [deployerPrivateKey] : [];
+const mnemonic = process.env.MNEMONIC;
+const sepoliaAccounts = mnemonic
+  ? { mnemonic }
+  : deployerPrivateKey
+    ? [deployerPrivateKey]
+    : [];
 
 const config: HardhatUserConfig = {
   solidity: {
