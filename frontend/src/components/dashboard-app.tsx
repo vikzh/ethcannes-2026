@@ -26,6 +26,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAccount, useBalance } from "wagmi";
 import {
   MOCK_ADDRESS,
@@ -122,6 +123,7 @@ export function DashboardApp() {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const router = useRouter();
   const displayAddress = address ?? "";
   const bal = balance?.value;
   const balanceLabel =
@@ -440,6 +442,7 @@ export function DashboardApp() {
               </ul>
               <button
                 type="button"
+                onClick={() => router.push("/onboard")}
                 className="mt-8 rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
               >
                 Get started
