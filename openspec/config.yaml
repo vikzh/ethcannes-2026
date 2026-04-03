@@ -1,0 +1,98 @@
+schema: spec-driven
+
+context: |
+  # Project: Agent Wallet (ETH Cannes 2026)
+
+  ## Problem
+  AI coding agents (OpenCode, Claude Code, OpenAI Codex) need to perform on-chain
+  transactions, but giving an agent direct access to sign with a user's wallet is
+  a critical security risk. We solve this with Account Abstraction: a smart contract
+  wallet that constrains what the agent can do, governed by policies the user controls.
+
+  ## Architecture Overview
+  - **Owner (EOA)**: The user's existing wallet (MetaMask, etc.). Owns the AA contract.
+  - **Agent Wallet**: A local key generated via Open Wallet Standard (OWS), stored
+    encrypted at `~/.ows/`. The agent interacts with the AA contract using this key.
+  - **AA Contract**: An ERC-7579 modular smart account on Base (Ethereum L2). Holds
+    tokens and enforces policies. Accepts transactions from both Owner and Agent.
+  - **Policies**: On-chain rules (spending limits, allowed targets, time constraints)
+    that govern what the agent can do. Managed via ERC-7579 modules.
+
+  ## Key Decisions
+  - Target chain: Base (Ethereum L2) - mature ERC-4337 infra, low gas
+  - AA pattern: ERC-4337 + ERC-7579 modular accounts on Base
+  - Account implementation: TBD (Safe 7579 adapter vs Kernel vs Biconomy Nexus)
+  - Policy engine: TBD (Rhinestone Smart Sessions vs custom validator module)
+  - Agent concurrency: Single agent per AA (multi-agent is a stretch goal)
+  - Deterministic deployment: CREATE2 factory (address known before deploy)
+  - On-chain proposals: Agent policy change requests are on-chain, require owner sig
+  - OWS integration: Profile B (subprocess spawn of `ows` CLI, not daemon)
+
+  ## Tech Stack
+  - Frontend: Next.js 16, React 19, Tailwind CSS 4, wagmi, viem, RainbowKit
+  - Smart contracts: Solidity, ERC-4337, ERC-7579, Foundry
+  - Backend: Custom indexer service (SaaS) for tx history
+  - Agent wallet: Open Wallet Standard (OWS) - Rust binary with Node.js bindings
+  - Install script: Bash, cross-agent (OpenCode, Claude Code, OpenAI Codex)
+  - Supported OS: macOS only (for hackathon)
+
+  ## Key Components
+  1. AA Contract - ERC-7579 modular account with policy modules
+  2. Frontend - Dashboard for tx history, policy management, onboarding
+  3. Backend - Indexer for AA contract events, serves tx history API
+  4. Install Script - One-liner that installs OWS wallet + agent skill globally
+
+  ## Key Workflow
+  1. User gets one-liner install command from frontend
+  2. Script installs OWS, generates agent wallet, installs skill for detected agents
+  3. Script outputs URL with pre-populated params (agent wallet address)
+  4. User clicks URL, signs tx to: deploy AA via factory, fund agent gas wallet
+  5. User configures policies and deposits funds on AA
+  6. Agent uses skill to initiate transactions within policy bounds
+  7. User monitors via dashboard; agent can request policy changes (requires owner sig)
+
+  ## Security Model
+  - Agent wallet can ONLY transact against the AA contract
+  - AA validates all transactions against on-chain policies
+  - Agent cannot access OWS wallet directly (subprocess isolation, Profile B)
+  - Privileged operations (policy changes, module installs) require owner signature
+  - OWS keys are encrypted at rest (AES-256-GCM), policy-gated API key access
+
+  ## Agent Skill Targets (global install)
+  - OpenCode: skill at ~/.opencode/skills/ or project .opencode/skills/
+  - Claude Code: CLAUDE.md integration
+  - OpenAI Codex: skill at ~/.agents/skills/ (SKILL.md format)
+
+  ## Conventions
+  - Conventional commits
+  - kebab-case for file and directory names
+  - TypeScript for frontend and backend
+  - Solidity 0.8.x for contracts
+  - All specs should reference ERC-4337, ERC-7579, and OWS spec docs
+
+  ## Key References
+  - ERC-7579: https://erc7579.com/
+  - Rhinestone ModuleKit: https://github.com/rhinestonewtf/modulekit
+  - Rhinestone Smart Sessions: https://docs.rhinestone.wtf/module-sdk/modules/smart-sessions
+  - OWS Spec: submodules/open-wallet-standard/docs/
+  - OWS CLI: submodules/open-wallet-standard/docs/sdk-cli.md
+  - OWS Agent Access: submodules/open-wallet-standard/docs/04-agent-access-layer.md
+  - Awesome Modular Accounts: https://github.com/rhinestonewtf/awesome-modular-accounts
+
+rules:
+  proposal:
+    - Reference specific ERC standards (4337, 7579) when discussing AA
+    - Clearly separate owner-controlled vs agent-controlled operations
+    - List security boundaries explicitly
+  specs:
+    - Each spec must define its trust boundaries
+    - Include error cases and failure modes
+    - Reference OWS spec sections where applicable
+  design:
+    - Include contract interface signatures
+    - Specify which ERC-7579 module types are used (validator, executor, hook)
+    - Document the subprocess invocation pattern for OWS
+  tasks:
+    - Break into chunks of max 3 hours each
+    - Frontend, contract, backend, and install script tasks should be parallelizable
+    - Include verification steps (test commands, manual checks)
