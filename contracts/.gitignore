@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Hardhat build outputs
+artifacts/
+cache/
+typechain-types/
+
+# Coverage
+coverage/
+coverage.json
+
+# TypeScript build
+dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
