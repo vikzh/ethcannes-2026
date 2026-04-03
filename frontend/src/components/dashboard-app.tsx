@@ -1,0 +1,556 @@
+"use client";
+
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { formatEther } from "viem";
+import {
+  ArrowLeftRight,
+  Bell,
+  BookOpen,
+  Clock,
+  Code2,
+  Coins,
+  Copy,
+  ExternalLink,
+  Home,
+  Info,
+  Landmark,
+  LayoutDashboard,
+  LayoutGrid,
+  Link2,
+  Loader2,
+  Menu,
+  Repeat2,
+  Search,
+  Settings,
+  Upload,
+  Wallet,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useAccount, useBalance } from "wagmi";
+import {
+  MOCK_ADDRESS,
+  MOCK_BALANCE_ETH,
+  MOCK_PERMISSIONS,
+  MOCK_TRANSACTIONS,
+  MOCK_WALLET_NAME,
+  type MockPermission,
+} from "@/lib/mock-data";
+
+type NavKey =
+  | "home"
+  | "assets"
+  | "transactions"
+  | "address-book"
+  | "apps"
+  | "swap"
+  | "bridge"
+  | "earn"
+  | "stake"
+  | "settings"
+  | "api";
+
+type TabKey = "queue" | "history" | "messages";
+
+function shortAddress(addr: string) {
+  const a = addr.startsWith("0x") ? addr : `0x${addr}`;
+  if (a.length < 12) return a;
+  return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
+function formatEthDisplay(value: bigint) {
+  const n = Number(formatEther(value));
+  if (n >= 1) return n.toFixed(4);
+  if (n >= 0.0001) return n.toFixed(6);
+  return n.toExponential(2);
+}
+
+function AddressAvatar({ address }: { address: string }) {
+  let hash = 0;
+  for (let i = 0; i < address.length; i++) {
+    hash = address.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h = Math.abs(hash) % 360;
+  return (
+    <div
+      className="h-9 w-9 shrink-0 rounded-full ring-1 ring-zinc-200"
+      style={{
+        background: `linear-gradient(135deg, hsl(${h}, 72%, 42%), hsl(${(h + 48) % 360}, 62%, 36%))`,
+      }}
+      aria-hidden
+    />
+  );
+}
+
+function NavItem({
+  icon: Icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: typeof Home;
+  label: string;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+        active
+          ? "bg-zinc-100 font-medium text-zinc-900"
+          : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+      }`}
+    >
+      <Icon className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
+      {label}
+    </button>
+  );
+}
+
+export function DashboardApp() {
+  const { address, isConnected } = useAccount();
+  const { data: balance } = useBalance({ address });
+
+  const [activeNav, setActiveNav] = useState<NavKey>("transactions");
+  const [tab, setTab] = useState<TabKey>("queue");
+  const [permissions, setPermissions] = useState<MockPermission[]>(() =>
+    MOCK_PERMISSIONS.map((p) => ({ ...p })),
+  );
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const displayAddress = address ?? "";
+  const bal = balance?.value;
+  const balanceLabel =
+    isConnected && bal != null
+      ? `${formatEthDisplay(bal)} ETH`
+      : `${MOCK_BALANCE_ETH} ETH`;
+
+  const copyAddress = useCallback(async () => {
+    const text = displayAddress || MOCK_ADDRESS;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  }, [displayAddress]);
+
+  useEffect(() => {
+    if (uploadProgress === null) return;
+    if (uploadProgress >= 100) {
+      const t = window.setTimeout(() => setUploadProgress(null), 800);
+      return () => window.clearTimeout(t);
+    }
+    const id = window.setInterval(() => {
+      setUploadProgress((p) => {
+        if (p === null) return null;
+        const next = p + 8 + Math.random() * 12;
+        return next >= 100 ? 100 : next;
+      });
+    }, 280);
+    return () => window.clearInterval(id);
+  }, [uploadProgress]);
+
+  const startUploadDemo = () => {
+    setUploadProgress(0);
+  };
+
+  const togglePermission = (id: string) => {
+    setPermissions((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, enabled: !p.enabled } : p)),
+    );
+  };
+
+  return (
+    <div className="flex min-h-screen bg-white text-zinc-900">
+      <aside className="flex w-[260px] shrink-0 flex-col border-r border-zinc-200 bg-white">
+        <div className="border-b border-zinc-200 p-4">
+          <div className="flex items-start gap-3">
+            <span className="mt-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600">
+              1/1
+            </span>
+            <AddressAvatar address={displayAddress || MOCK_WALLET_NAME} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{MOCK_WALLET_NAME}</p>
+              <button
+                type="button"
+                onClick={copyAddress}
+                className="mt-0.5 flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800"
+              >
+                <span className="font-mono">
+                  {displayAddress
+                    ? shortAddress(displayAddress)
+                    : shortAddress(MOCK_ADDRESS)}
+                </span>
+                <Copy className="h-3 w-3" />
+                {copied ? (
+                  <span className="text-emerald-600">Copied</span>
+                ) : null}
+              </button>
+              <p className="mt-2 text-xs text-zinc-500">Balance</p>
+              <p className="font-mono text-sm font-medium">{balanceLabel}</p>
+            </div>
+          </div>
+          <div className="mt-3 flex gap-1">
+            {[
+              [LayoutDashboard, "Dashboard"],
+              [Copy, "Copy"],
+              [ExternalLink, "Open"],
+              [Info, "Info"],
+            ].map(([Icon, title], i) => (
+              <button
+                key={i}
+                type="button"
+                title={title as string}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-800"
+              >
+                <Icon className="h-4 w-4" strokeWidth={1.75} />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-3">
+          <button
+            type="button"
+            className="mb-4 w-full rounded-xl bg-zinc-900 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+          >
+            Activate now
+          </button>
+
+          <nav className="space-y-0.5">
+            <NavItem
+              icon={Home}
+              label="Home"
+              active={activeNav === "home"}
+              onClick={() => setActiveNav("home")}
+            />
+            <NavItem
+              icon={Wallet}
+              label="Assets"
+              active={activeNav === "assets"}
+              onClick={() => setActiveNav("assets")}
+            />
+            <NavItem
+              icon={ArrowLeftRight}
+              label="Transactions"
+              active={activeNav === "transactions"}
+              onClick={() => setActiveNav("transactions")}
+            />
+            <NavItem
+              icon={BookOpen}
+              label="Address book"
+              active={activeNav === "address-book"}
+              onClick={() => setActiveNav("address-book")}
+            />
+            <NavItem
+              icon={LayoutGrid}
+              label="Apps"
+              active={activeNav === "apps"}
+              onClick={() => setActiveNav("apps")}
+            />
+          </nav>
+
+          <p className="mb-1 mt-5 px-3 text-[11px] font-medium uppercase tracking-wide text-zinc-400">
+            Tools
+          </p>
+          <nav className="space-y-0.5">
+            <NavItem
+              icon={Repeat2}
+              label="Swap"
+              active={activeNav === "swap"}
+              onClick={() => setActiveNav("swap")}
+            />
+            <NavItem
+              icon={Link2}
+              label="Bridge"
+              active={activeNav === "bridge"}
+              onClick={() => setActiveNav("bridge")}
+            />
+            <NavItem
+              icon={Coins}
+              label="Earn"
+              active={activeNav === "earn"}
+              onClick={() => setActiveNav("earn")}
+            />
+            <NavItem
+              icon={Landmark}
+              label="Stake"
+              active={activeNav === "stake"}
+              onClick={() => setActiveNav("stake")}
+            />
+          </nav>
+
+          <p className="mb-1 mt-5 px-3 text-[11px] font-medium uppercase tracking-wide text-zinc-400">
+            Permissions
+          </p>
+          <ul className="space-y-2 px-1 pb-2">
+            {permissions.map((p) => (
+              <li
+                key={p.id}
+                className="rounded-lg border border-zinc-200 bg-zinc-50/80 p-2.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-zinc-900">{p.label}</p>
+                    <p className="mt-0.5 text-[11px] leading-snug text-zinc-500">
+                      {p.description}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={p.enabled}
+                    onClick={() => togglePermission(p.id)}
+                    className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                      p.enabled ? "bg-zinc-900" : "bg-zinc-300"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                        p.enabled ? "left-4" : "left-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <nav className="mt-auto space-y-0.5 border-t border-zinc-100 pt-3">
+            <NavItem
+              icon={Settings}
+              label="Settings"
+              active={activeNav === "settings"}
+              onClick={() => setActiveNav("settings")}
+            />
+            <div className="relative">
+              <NavItem
+                icon={Code2}
+                label="API"
+                active={activeNav === "api"}
+                onClick={() => setActiveNav("api")}
+              />
+              <span className="pointer-events-none absolute right-3 top-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
+                New
+              </span>
+            </div>
+          </nav>
+        </div>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200 px-5">
+          <span className="text-lg font-semibold tracking-tight">
+            AI<span className="text-zinc-500"> wallet info</span>
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="hidden rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 sm:block"
+              aria-label="Search"
+            >
+              <Search className="h-5 w-5" strokeWidth={1.5} />
+            </button>
+            <button
+              type="button"
+              className="hidden rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 sm:block"
+              aria-label="Notifications"
+            >
+              <Bell className="h-5 w-5" strokeWidth={1.5} />
+            </button>
+            <button
+              type="button"
+              className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100"
+              aria-label="Menu"
+            >
+              <Menu className="h-5 w-5" strokeWidth={1.5} />
+            </button>
+            <ConnectButton.Custom>
+              {({
+                account,
+                chain,
+                mounted,
+                openConnectModal,
+                openAccountModal,
+              }) => {
+                const ready = mounted;
+                const connected = ready && account && chain;
+                if (!connected) {
+                  return (
+                    <button
+                      type="button"
+                      onClick={openConnectModal}
+                      className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 shadow-sm hover:bg-zinc-50"
+                    >
+                      Connect wallet
+                    </button>
+                  );
+                }
+                return (
+                  <button
+                    type="button"
+                    onClick={openAccountModal}
+                    className="flex max-w-[min(100vw-8rem,320px)] items-center gap-2 rounded-full border border-zinc-200 bg-white py-1 pl-1 pr-3 text-sm shadow-sm hover:bg-zinc-50"
+                  >
+                    <AddressAvatar address={account.address} />
+                    <span className="truncate font-mono text-xs text-zinc-700">
+                      {chain.name?.slice(0, 3)}:{shortAddress(account.address)}
+                    </span>
+                    <span className="shrink-0 text-zinc-500">{balanceLabel}</span>
+                    <span
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-blue-600 text-[10px] font-bold text-white"
+                      title={chain.name}
+                    >
+                      ◆
+                    </span>
+                  </button>
+                );
+              }}
+            </ConnectButton.Custom>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-auto p-6">
+          <div className="mx-auto max-w-4xl">
+            <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-zinc-200">
+              <div className="flex gap-6">
+                {(
+                  [
+                    ["queue", "Queue"],
+                    ["history", "History"],
+                    ["messages", "Messages"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setTab(key)}
+                    className={`relative pb-3 text-sm font-medium transition-colors ${
+                      tab === key
+                        ? "text-zinc-900"
+                        : "text-zinc-500 hover:text-zinc-800"
+                    }`}
+                  >
+                    {label}
+                    {tab === key ? (
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-zinc-900" />
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                disabled
+                className="mb-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-sm font-medium text-zinc-400"
+              >
+                Bulk execute
+              </button>
+            </div>
+
+            {tab === "queue" && (
+              <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 px-6 py-16 text-center">
+                {uploadProgress !== null ? (
+                  <div className="w-full max-w-sm">
+                    <div className="mb-3 flex items-center justify-center gap-2 text-zinc-700">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                      <span className="text-sm font-medium">
+                        Uploading batch…
+                      </span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-zinc-200">
+                      <div
+                        className="h-full rounded-full bg-zinc-900 transition-[width] duration-200"
+                        style={{ width: `${Math.min(100, uploadProgress)}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 font-mono text-xs text-zinc-500">
+                      {Math.round(Math.min(100, uploadProgress))}%
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-zinc-200">
+                      <Clock className="h-7 w-7 text-zinc-400" strokeWidth={1.25} />
+                    </div>
+                    <p className="max-w-xs text-sm text-zinc-600">
+                      Queued transactions will appear here.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={startUploadDemo}
+                      className="mt-6 inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Simulate upload
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {tab === "history" && (
+              <div className="overflow-hidden rounded-xl border border-zinc-200">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-zinc-200 bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                    <tr>
+                      <th className="px-4 py-3">Type</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3 text-right">Amount</th>
+                      <th className="px-4 py-3">Label</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100">
+                    {MOCK_TRANSACTIONS.map((tx) => (
+                      <tr key={tx.id} className="bg-white hover:bg-zinc-50/80">
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${
+                              tx.direction === "in"
+                                ? "bg-emerald-50 text-emerald-800"
+                                : "bg-orange-50 text-orange-800"
+                            }`}
+                          >
+                            {tx.direction === "in" ? "In" : "Out"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={
+                              tx.status === "success"
+                                ? "text-emerald-700"
+                                : "text-red-600"
+                            }
+                          >
+                            {tx.status === "success" ? "Success" : "Failed"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-zinc-600">
+                          {new Date(tx.date).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-xs font-medium">
+                          {tx.amount}
+                        </td>
+                        <td className="px-4 py-3 text-zinc-600">{tx.label}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {tab === "messages" && (
+              <div className="flex min-h-[280px] flex-col items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50/30 px-6 py-12 text-center text-sm text-zinc-500">
+                No off-chain messages yet.
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
