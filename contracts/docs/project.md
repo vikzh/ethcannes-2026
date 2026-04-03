@@ -109,13 +109,13 @@ Key benefits of this approach:
 * clearer security review boundaries
 * better interoperability with the modular account ecosystem
 
-### ERC-4337 compatibility
+### Transaction model
 
-The MVP targets **ERC-4337-compatible UserOperations** routed through a standard EntryPoint contract. Validators implement the `validateUserOp` interface. This means the agent submits UserOps that are validated onchain by the agent session validator before execution. Direct calls from the owner EOA are also supported for admin operations.
+The MVP uses **regular onchain transactions** without EntryPoint, paymaster, or bundler dependencies. The account supports owner direct execution for admin actions and EIP-712 signed delegated execution for agents. Session validity and policy checks are enforced onchain before execution.
 
 ### Account base
 
-The project builds on an existing ERC-7579 account implementation (e.g., **Rhinestone ModuleKit** or **Safe7579**) rather than implementing the account from scratch. The custom work focuses on the validator, policy, and whitelist modules.
+The project includes a custom isolated account implementation for networks where ERC-4337 infrastructure is not required. It keeps ERC-7579-style module separation (validator/executor/hook) while using standard transactions.
 
 ---
 
@@ -397,8 +397,7 @@ Pause and revocation paths should never depend on agent cooperation.
 
 ### In scope for MVP
 
-* ERC-7579 smart account base (built on Rhinestone ModuleKit or Safe7579)
-* ERC-4337-compatible UserOperation flow via standard EntryPoint
+* isolated modular account with regular transaction execution (no EntryPoint/paymaster)
 * owner validator (ECDSA signature validation)
 * agent session validator (EOA session key with expiry and revocation)
 * `(address, selector)` tuple-based whitelist with wildcard selector support
@@ -410,7 +409,7 @@ Pause and revocation paths should never depend on agent cooperation.
 * `delegatecall` blocked for agent sessions
 * session expiry and revocation
 * owner-only emergency pause
-* end-to-end Foundry tests covering allowed execution, rejected execution, whitelist request/approval, spend limit enforcement, and emergency pause
+* end-to-end Hardhat tests covering allowed execution, rejected execution, whitelist request/approval, spend limit enforcement, and emergency pause
 
 ### Out of scope for MVP
 
