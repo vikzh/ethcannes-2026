@@ -166,7 +166,7 @@ export function DashboardApp() {
 
   return (
     <div className="flex min-h-screen bg-white text-zinc-900">
-      <aside className="flex w-[260px] shrink-0 flex-col border-r border-zinc-200 bg-white">
+      {isConnected && <aside className="flex w-[260px] shrink-0 flex-col border-r border-zinc-200 bg-white">
         <div className="border-b border-zinc-200 p-4">
           <div className="flex items-start gap-3">
             <span className="mt-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600">
@@ -340,7 +340,7 @@ export function DashboardApp() {
             </div>
           </nav>
         </div>
-      </aside>
+      </aside>}
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200 px-5">
