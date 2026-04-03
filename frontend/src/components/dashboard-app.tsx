@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { formatEther } from "viem";
 import {
@@ -348,9 +349,12 @@ export function DashboardApp() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200 px-5">
-          <span className="text-lg font-semibold tracking-tight">
-            Safe wallet for<span className="text-zinc-500"> AI agents</span>
-          </span>
+          <div className="flex items-center gap-3">
+            <Image src="/logo.svg" alt="Logo" width={96} height={96} className="-ml-5 h-28 w-28 object-contain" />
+            <span className="text-lg font-semibold tracking-tight">
+              Safe wallet for<span className="text-zinc-500"> AI agents</span>
+            </span>
+          </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
