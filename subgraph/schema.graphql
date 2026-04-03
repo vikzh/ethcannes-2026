@@ -1,0 +1,56 @@
+type Account @entity {
+  id: ID!
+  owner: Bytes!
+  policyHook: Bytes
+  agentSessionValidator: Bytes
+  deployedAtBlock: BigInt!
+  deployedAtTimestamp: BigInt!
+  deployedTxHash: Bytes!
+  createdBy: Bytes!
+  updatedAtBlock: BigInt!
+  updatedAtTimestamp: BigInt!
+}
+
+type ExecutionEnvelope @entity {
+  id: ID!
+  account: Bytes!
+  signer: Bytes!
+  caller: Bytes!
+  nonce: BigInt!
+  mode: Bytes!
+  deadline: BigInt!
+  executionHash: Bytes!
+  callCount: BigInt!
+  policyChecked: Boolean!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+type ExecutionCall @entity {
+  id: ID!
+  account: Bytes!
+  target: Bytes!
+  value: BigInt!
+  selector: Bytes!
+  nonce: BigInt!
+  executionHash: Bytes!
+  callIndex: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+type WhitelistRequest @entity {
+  id: ID!
+  account: Bytes!
+  requestId: BigInt!
+  target: Bytes!
+  selector: Bytes!
+  metadata: String!
+  status: String!
+  createdAt: BigInt!
+  updatedAt: BigInt!
+  createdTxHash: Bytes!
+  updatedTxHash: Bytes!
+}

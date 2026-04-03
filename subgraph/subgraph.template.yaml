@@ -1,0 +1,82 @@
+specVersion: 1.0.0
+schema:
+  file: ./schema.graphql
+
+dataSources:
+  - kind: ethereum
+    name: AbstractAccountFactory
+    network: sepolia
+    source:
+      abi: AbstractAccountFactory
+      address: "__FACTORY_ADDRESS__"
+      startBlock: __FACTORY_START_BLOCK__
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Account
+      abis:
+        - name: AbstractAccountFactory
+          file: ../contracts/artifacts/src/factory/AbstractAccountFactory.sol/AbstractAccountFactory.json
+      eventHandlers:
+        - event: AccountDeployed(indexed address,indexed address,address,bytes32,address)
+          handler: handleAccountDeployed
+      file: ./src/factory.ts
+
+  - kind: ethereum
+    name: WhitelistRequestModule
+    network: sepolia
+    source:
+      abi: WhitelistRequestModule
+      address: "__WHITELIST_MODULE_ADDRESS__"
+      startBlock: __WHITELIST_MODULE_START_BLOCK__
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - WhitelistRequest
+      abis:
+        - name: WhitelistRequestModule
+          file: ../contracts/artifacts/src/modules/WhitelistRequestModule.sol/WhitelistRequestModule.json
+      eventHandlers:
+        - event: WhitelistRequested(indexed address,indexed uint256,indexed address,bytes4,string)
+          handler: handleWhitelistRequested
+        - event: WhitelistApproved(indexed address,indexed uint256,indexed address,bytes4)
+          handler: handleWhitelistApproved
+        - event: WhitelistRejected(indexed address,indexed uint256)
+          handler: handleWhitelistRejected
+        - event: WhitelistRequestCancelled(indexed address,indexed uint256)
+          handler: handleWhitelistRequestCancelled
+      file: ./src/whitelist-request-module.ts
+
+templates:
+  - kind: ethereum
+    name: IsolatedAccount
+    network: sepolia
+    source:
+      abi: IsolatedAccount
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Account
+        - ExecutionEnvelope
+        - ExecutionCall
+      abis:
+        - name: IsolatedAccount
+          file: ../contracts/artifacts/src/accounts/IsolatedAccount.sol/IsolatedAccount.json
+      eventHandlers:
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+        - event: PolicyHookSet(indexed address)
+          handler: handlePolicyHookSet
+        - event: AgentSessionValidatorSet(indexed address)
+          handler: handleAgentSessionValidatorSet
+        - event: ExecutionEnvelope(indexed address,indexed address,indexed address,uint256,bytes32,uint256,bytes32,uint256,bool)
+          handler: handleExecutionEnvelope
+        - event: Executed(indexed address,uint256,bytes4,indexed uint256,indexed bytes32,uint256)
+          handler: handleExecuted
+      file: ./src/isolated-account.ts

@@ -1,0 +1,17 @@
+{
+  "name": "@ethcannes/subgraph",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "prepare:sepolia": "node scripts/prepare-sepolia.js",
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "build:sepolia": "npm run prepare:sepolia && npm run codegen && npm run build"
+  },
+  "devDependencies": {
+    "@graphprotocol/graph-cli": "latest"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-ts": "latest"
+  }
+}
