@@ -36,6 +36,8 @@ import {
   type MockPermission,
 } from "@/lib/mock-data";
 
+const HIDE = true;
+
 type NavKey =
   | "home"
   | "assets"
@@ -166,7 +168,7 @@ export function DashboardApp() {
 
   return (
     <div className="flex min-h-screen bg-white text-zinc-900">
-      {isConnected && <aside className="flex w-[260px] shrink-0 flex-col border-r border-zinc-200 bg-white">
+      {!HIDE && isConnected && <aside className="flex w-[260px] shrink-0 flex-col border-r border-zinc-200 bg-white">
         <div className="border-b border-zinc-200 p-4">
           <div className="flex items-start gap-3">
             <span className="mt-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600">
@@ -345,7 +347,7 @@ export function DashboardApp() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200 px-5">
           <span className="text-lg font-semibold tracking-tight">
-            AI<span className="text-zinc-500"> wallet info</span>
+            Safe wallet for<span className="text-zinc-500"> AI agents</span>
           </span>
           <div className="flex items-center gap-2">
             <button
@@ -414,142 +416,174 @@ export function DashboardApp() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto p-6">
-          <div className="mx-auto max-w-4xl">
-            <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-zinc-200">
-              <div className="flex gap-6">
-                {(
-                  [
-                    ["queue", "Queue"],
-                    ["history", "History"],
-                    ["messages", "Messages"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setTab(key)}
-                    className={`relative pb-3 text-sm font-medium transition-colors ${
-                      tab === key
-                        ? "text-zinc-900"
-                        : "text-zinc-500 hover:text-zinc-800"
-                    }`}
-                  >
-                    {label}
-                    {tab === key ? (
-                      <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-zinc-900" />
-                    ) : null}
-                  </button>
+        {HIDE ? (
+          <main className="flex flex-1 items-center px-10 pb-20 pt-[8vh]" style={{ justifyContent: "left", paddingLeft: "20%" }}>
+            <div className="w-full max-w-md">
+              <h1 className="text-2xl font-semibold leading-snug tracking-tight text-zinc-900">
+                Create a dedicated wallet<br />
+                that lets your AI agent<br />
+                make only approved transactions
+              </h1>
+              <ul className="mt-6 space-y-2">
+                {[
+                  "Approved destinations",
+                  "Spending limits",
+                  "Transaction frequency",
+                  "Always allowed actions",
+                  "One-time approvals",
+                ].map((item) => (
+                  <li key={item} className="flex items-center gap-2.5 text-sm text-zinc-600">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[10px] font-bold text-zinc-500">✓</span>
+                    {item}
+                  </li>
                 ))}
-              </div>
+              </ul>
               <button
                 type="button"
-                disabled
-                className="mb-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-sm font-medium text-zinc-400"
+                className="mt-8 rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
               >
-                Bulk execute
+                Get started
               </button>
             </div>
-
-            {tab === "queue" && (
-              <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 px-6 py-16 text-center">
-                {uploadProgress !== null ? (
-                  <div className="w-full max-w-sm">
-                    <div className="mb-3 flex items-center justify-center gap-2 text-zinc-700">
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                      <span className="text-sm font-medium">
-                        Uploading batch…
-                      </span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-zinc-200">
-                      <div
-                        className="h-full rounded-full bg-zinc-900 transition-[width] duration-200"
-                        style={{ width: `${Math.min(100, uploadProgress)}%` }}
-                      />
-                    </div>
-                    <p className="mt-2 font-mono text-xs text-zinc-500">
-                      {Math.round(Math.min(100, uploadProgress))}%
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-zinc-200">
-                      <Clock className="h-7 w-7 text-zinc-400" strokeWidth={1.25} />
-                    </div>
-                    <p className="max-w-xs text-sm text-zinc-600">
-                      Queued transactions will appear here.
-                    </p>
+          </main>
+        ) : (
+          <main className="flex-1 overflow-auto p-6">
+            <div className="mx-auto max-w-4xl">
+              <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-zinc-200">
+                <div className="flex gap-6">
+                  {(
+                    [
+                      ["queue", "Queue"],
+                      ["history", "History"],
+                      ["messages", "Messages"],
+                    ] as const
+                  ).map(([key, label]) => (
                     <button
+                      key={key}
                       type="button"
-                      onClick={startUploadDemo}
-                      className="mt-6 inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                      onClick={() => setTab(key)}
+                      className={`relative pb-3 text-sm font-medium transition-colors ${
+                        tab === key
+                          ? "text-zinc-900"
+                          : "text-zinc-500 hover:text-zinc-800"
+                      }`}
                     >
-                      <Upload className="h-4 w-4" />
-                      Simulate upload
+                      {label}
+                      {tab === key ? (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-zinc-900" />
+                      ) : null}
                     </button>
-                  </>
-                )}
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  disabled
+                  className="mb-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-sm font-medium text-zinc-400"
+                >
+                  Bulk execute
+                </button>
               </div>
-            )}
 
-            {tab === "history" && (
-              <div className="overflow-hidden rounded-xl border border-zinc-200">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b border-zinc-200 bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500">
-                    <tr>
-                      <th className="px-4 py-3">Type</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Date</th>
-                      <th className="px-4 py-3 text-right">Amount</th>
-                      <th className="px-4 py-3">Label</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100">
-                    {MOCK_TRANSACTIONS.map((tx) => (
-                      <tr key={tx.id} className="bg-white hover:bg-zinc-50/80">
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${
-                              tx.direction === "in"
-                                ? "bg-emerald-50 text-emerald-800"
-                                : "bg-orange-50 text-orange-800"
-                            }`}
-                          >
-                            {tx.direction === "in" ? "In" : "Out"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={
-                              tx.status === "success"
-                                ? "text-emerald-700"
-                                : "text-red-600"
-                            }
-                          >
-                            {tx.status === "success" ? "Success" : "Failed"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs text-zinc-600">
-                          {new Date(tx.date).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-xs font-medium">
-                          {tx.amount}
-                        </td>
-                        <td className="px-4 py-3 text-zinc-600">{tx.label}</td>
+              {tab === "queue" && (
+                <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 px-6 py-16 text-center">
+                  {uploadProgress !== null ? (
+                    <div className="w-full max-w-sm">
+                      <div className="mb-3 flex items-center justify-center gap-2 text-zinc-700">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        <span className="text-sm font-medium">
+                          Uploading batch…
+                        </span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-zinc-200">
+                        <div
+                          className="h-full rounded-full bg-zinc-900 transition-[width] duration-200"
+                          style={{ width: `${Math.min(100, uploadProgress)}%` }}
+                        />
+                      </div>
+                      <p className="mt-2 font-mono text-xs text-zinc-500">
+                        {Math.round(Math.min(100, uploadProgress))}%
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-zinc-200">
+                        <Clock className="h-7 w-7 text-zinc-400" strokeWidth={1.25} />
+                      </div>
+                      <p className="max-w-xs text-sm text-zinc-600">
+                        Queued transactions will appear here.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={startUploadDemo}
+                        className="mt-6 inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                      >
+                        <Upload className="h-4 w-4" />
+                        Simulate upload
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {tab === "history" && (
+                <div className="overflow-hidden rounded-xl border border-zinc-200">
+                  <table className="w-full text-left text-sm">
+                    <thead className="border-b border-zinc-200 bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                      <tr>
+                        <th className="px-4 py-3">Type</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Date</th>
+                        <th className="px-4 py-3 text-right">Amount</th>
+                        <th className="px-4 py-3">Label</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100">
+                      {MOCK_TRANSACTIONS.map((tx) => (
+                        <tr key={tx.id} className="bg-white hover:bg-zinc-50/80">
+                          <td className="px-4 py-3">
+                            <span
+                              className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${
+                                tx.direction === "in"
+                                  ? "bg-emerald-50 text-emerald-800"
+                                  : "bg-orange-50 text-orange-800"
+                              }`}
+                            >
+                              {tx.direction === "in" ? "In" : "Out"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={
+                                tx.status === "success"
+                                  ? "text-emerald-700"
+                                  : "text-red-600"
+                              }
+                            >
+                              {tx.status === "success" ? "Success" : "Failed"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-mono text-xs text-zinc-600">
+                            {new Date(tx.date).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-xs font-medium">
+                            {tx.amount}
+                          </td>
+                          <td className="px-4 py-3 text-zinc-600">{tx.label}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
-            {tab === "messages" && (
-              <div className="flex min-h-[280px] flex-col items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50/30 px-6 py-12 text-center text-sm text-zinc-500">
-                No off-chain messages yet.
-              </div>
-            )}
-          </div>
-        </main>
+              {tab === "messages" && (
+                <div className="flex min-h-[280px] flex-col items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50/30 px-6 py-12 text-center text-sm text-zinc-500">
+                  No off-chain messages yet.
+                </div>
+              )}
+            </div>
+          </main>
+        )}
       </div>
     </div>
   );
