@@ -1,11 +1,30 @@
 import { z } from "zod";
-import { formatEther, formatUnits, encodeFunctionData, serializeTransaction } from "viem";
+import {
+  formatEther,
+  formatUnits,
+  encodeFunctionData,
+  serializeTransaction,
+  isAddress,
+  getAddress,
+} from "viem";
 import { getPublicClient } from "../lib/rpc.js";
 import { ISOLATED_ACCOUNT_ABI } from "../lib/abi/isolated-account.js";
 import { POLICY_HOOK_ABI } from "../lib/abi/policy-hook.js";
 import { AGENT_SESSION_ABI } from "../lib/abi/agent-session.js";
 import { WHITELIST_REQUEST_ABI, REQUEST_STATUS } from "../lib/abi/whitelist-request.js";
 import { ACTIVE_CHAIN_ID, RPC_URL, explorerAddressUrl, explorerTxUrl } from "../lib/constants.js";
+
+const SELECTOR_HEX = /^0x[0-9a-fA-F]{8}$/;
+const MIN_REASON_LEN = 20;
+
+/** Compact on-chain metadata: three lines for owner review. */
+function buildWhitelistRequestMetadata({ business_reason, contract, selector }) {
+  return [
+    `business_reason: ${business_reason.trim()}`,
+    `contract: ${contract}`,
+    `selector: ${selector}`,
+  ].join("\n");
+}
 
 const WHITELIST_MODULE_ABI = [
   { name: "whitelistModule", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
@@ -291,28 +310,56 @@ export function registerAccountTools(server, { owsExec, readApiKey, walletName, 
 
   server.tool(
     "account_request_whitelist",
-    "Submit an on-chain request to whitelist a (target, selector) pair so the agent can interact with a new contract/function. Calls requestWhitelistAdditionAsAgent directly on the IsolatedAccount (no executeAuthorized needed). The owner must approve the request before it takes effect.",
+    "Submit a whitelist request for (contract, selector). On-chain metadata is exactly three lines: business_reason, contract address, selector. Calls requestWhitelistAdditionAsAgent on the IsolatedAccount; the owner must approve.",
     {
-      target: z.string().describe("Contract address to whitelist"),
-      selector: z.string().describe("Function selector (4-byte hex, e.g. '0xa9059cbb' for transfer). Use '0xffffffff' for wildcard (all functions)"),
-      metadata: z.string().describe("Justification for the request (e.g. 'Uniswap V3 Router - exactInputSingle swap; allowedDestination=0x...; dailyLimit=100/day')"),
+      business_reason: z
+        .string()
+        .transform((s) => s.trim())
+        .pipe(
+          z
+            .string()
+            .min(MIN_REASON_LEN)
+            .describe(
+              "One concise business justification, e.g. why this call is needed (protocol, asset, pool/fee if relevant)",
+            ),
+        ),
+      contract: z
+        .string()
+        .transform((s) => s.trim())
+        .refine((s) => isAddress(s, { strict: false }), {
+          message: "contract must be a valid EVM address",
+        })
+        .transform((s) => getAddress(s))
+        .describe("Target contract to whitelist, e.g. SwapRouter02 or token"),
+      selector: z
+        .string()
+        .transform((s) => s.trim())
+        .refine((s) => SELECTOR_HEX.test(s), {
+          message: "selector must be 4-byte hex, e.g. 0x04e45aaf or 0xffffffff for wildcard",
+        })
+        .describe("Function selector (bytes4), e.g. 0x04e45aaf. Use 0xffffffff for wildcard"),
     },
-    async ({ target, selector, metadata }) => {
+    async ({ business_reason, contract: contractAddr, selector: sel }) => {
       try {
+        const metadata = buildWhitelistRequestMetadata({
+          business_reason,
+          contract: contractAddr,
+          selector: sel,
+        });
+
         const calldata = encodeFunctionData({
           abi: ISOLATED_ACCOUNT_WHITELIST_ABI,
           functionName: "requestWhitelistAdditionAsAgent",
-          args: [target, selector, metadata],
+          args: [contractAddr, sel, metadata],
         });
 
         const { txHash, status, blockNumber } = await broadcastAgentTx(accountAddress, calldata);
 
         const lines = [
           `Whitelist Request Submitted`,
-          `  Target: ${target}`,
-          `  Selector: ${selector}`,
-          `  Metadata: ${metadata}`,
-          `  Account: ${accountAddress}`,
+          `  Metadata:`,
+          ...metadata.split("\n").map((line) => `    ${line}`),
+          `  IsolatedAccount: ${accountAddress}`,
           ``,
           `  Tx Hash: ${txHash || "(unknown)"}`,
           `  Status: ${status}`,

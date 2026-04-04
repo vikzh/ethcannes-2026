@@ -15,7 +15,15 @@ import { registerContractTools } from "./tools/contract.js";
 import { registerTransactionTools } from "./tools/transaction.js";
 import { registerAccountTools } from "./tools/account.js";
 import { getPublicClient } from "./lib/rpc.js";
-import { PROTOCOLS, TOKENS, FACTORY_ADDRESS, ACTIVE_CHAIN_ID, explorerAddressUrl } from "./lib/constants.js";
+import {
+  PROTOCOLS,
+  TOKENS,
+  SEPOLIA_TOKENS,
+  FACTORY_ADDRESS,
+  ACTIVE_CHAIN_ID,
+  explorerAddressUrl,
+} from "./lib/constants.js";
+import { sepolia } from "viem/chains";
 
 const WALLET_NAME = process.env.AGENT_WALLET_NAME || "agent-wallet";
 const KEY_FILE = join(homedir(), ".ows", `${WALLET_NAME}.key`);
@@ -108,16 +116,21 @@ const aaInstructions = aaAccount
     `- account_get_policy: Read policy config (paused, native value cap)`,
     ``,
     `Whitelist Management Tools:`,
-    `- account_request_whitelist: Request whitelisting of a (target, selector) pair.`,
+    `- account_request_whitelist: Request whitelisting of a (contract, selector) pair.`,
+    `  REQUIRED (three fields only; stored verbatim as compact metadata):`,
+    `    • business_reason — one line/paragraph, e.g. why the swap or call is needed`,
+    `    • contract — target address (e.g. SwapRouter02)`,
+    `    • selector — 4-byte hex (e.g. 0x04e45aaf) or 0xffffffff for wildcard`,
     `  The request goes through the WhitelistRequestModule. The owner must approve it.`,
-    `  Returns a tx object — pass it to send_transaction to submit on-chain.`,
+    `  Returns confirmation text after the agent submits the request transaction on-chain.`,
     `- account_cancel_whitelist_request: Cancel a pending whitelist request you submitted.`,
     `- account_get_pending_requests: List all pending whitelist requests for the account.`,
     `- account_get_whitelist_request: Look up a specific request by ID.`,
     ``,
     `If a transaction reverts with "NotWhitelisted" or "SpendLimitExceeded",`,
-    `use account_check_whitelist to verify, then account_request_whitelist to`,
-    `request the missing entry. The owner must approve it before retrying.`,
+    `use account_check_whitelist to verify, then account_request_whitelist with`,
+    `business_reason, contract, and selector.`,
+    `The owner must approve the pending request before retrying.`,
   ]
   : [];
 
@@ -146,9 +159,9 @@ const server = new McpServer(
       ``,
       `== DeFi Tools ==`,
       ``,
-      `Uniswap V3 (Router: ${PROTOCOLS.UNISWAP_V3_ROUTER}):`,
-      `- uniswap_swap: Encode a swap transaction. Returns tx for send_transaction.`,
-      `- uniswap_quote: Get a price quote without executing.`,
+      `Uniswap V3 SwapRouter02 (chain ${ACTIVE_CHAIN_ID}, Router: ${PROTOCOLS.UNISWAP_V3_ROUTER}, QuoterV2: ${PROTOCOLS.UNISWAP_V3_QUOTER}):`,
+      `- uniswap_swap: Encode exactInputSingle; requires a working on-chain quote for this chain.`,
+      `- uniswap_quote: Quote via QuoterV2 without executing.`,
       ``,
       `Aave V3 (Pool: ${PROTOCOLS.AAVE_V3_POOL}):`,
       `- aave_supply: Encode a supply/deposit transaction.`,
@@ -178,13 +191,24 @@ const server = new McpServer(
       `- sign_message: Sign arbitrary data with the agent wallet.`,
       `- get_address: Get the agent wallet address.`,
       ``,
-      `== Common Token Addresses (Base) ==`,
-      `WETH:  ${TOKENS.WETH}`,
-      `USDC:  ${TOKENS.USDC}`,
-      `USDT:  ${TOKENS.USDT}`,
-      `DAI:   ${TOKENS.DAI}`,
-      `cbETH: ${TOKENS.cbETH}`,
-      `wstETH: ${TOKENS.wstETH}`,
+      ...(ACTIVE_CHAIN_ID === sepolia.id
+        ? [
+            `== Common Token Addresses (Ethereum Sepolia) ==`,
+            `WETH (WETH9, Uniswap / native wrap): ${SEPOLIA_TOKENS.WETH}`,
+            `USDC (Circle testnet): ${SEPOLIA_TOKENS.USDC}`,
+            `USDT: ${SEPOLIA_TOKENS.USDT}`,
+            `DAI:  ${SEPOLIA_TOKENS.DAI}`,
+            `LINK: ${SEPOLIA_TOKENS.LINK}`,
+          ]
+        : [
+            `== Common Token Addresses (Base) ==`,
+            `WETH:  ${TOKENS.WETH}`,
+            `USDC:  ${TOKENS.USDC}`,
+            `USDT:  ${TOKENS.USDT}`,
+            `DAI:   ${TOKENS.DAI}`,
+            `cbETH: ${TOKENS.cbETH}`,
+            `wstETH: ${TOKENS.wstETH}`,
+          ]),
       ...aaInstructions,
       ``,
       `== Typical Workflow ==`,
@@ -275,12 +299,14 @@ server.prompt(
     amountIn: z.string().optional().describe("Amount of input token (default: 0.01)"),
   },
   async ({ tokenIn, tokenOut, amountIn }) => {
-    tokenIn = tokenIn || TOKENS.WETH;
-    tokenOut = tokenOut || TOKENS.USDC;
+    const defaultIn = ACTIVE_CHAIN_ID === sepolia.id ? SEPOLIA_TOKENS.WETH : TOKENS.WETH;
+    const defaultOut = ACTIVE_CHAIN_ID === sepolia.id ? SEPOLIA_TOKENS.USDC : TOKENS.USDC;
+    tokenIn = tokenIn || defaultIn;
+    tokenOut = tokenOut || defaultOut;
     amountIn = amountIn || "0.01";
     const swapPayload = JSON.stringify({
       action: "uniswap-v3-swap",
-      chain: "base",
+      chain: ACTIVE_CHAIN_ID === sepolia.id ? "sepolia" : "base",
       router: PROTOCOLS.UNISWAP_V3_ROUTER,
       params: {
         tokenIn,

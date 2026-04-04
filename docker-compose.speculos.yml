@@ -1,0 +1,30 @@
+# Speculos — Ledger hardware wallet emulator with Ethereum app.
+#
+# Usage:
+#   docker compose -f docker-compose.speculos.yml up [-d]
+#
+# Custom seed:
+#   SPECULOS_SEED="test test ..." docker compose -f docker-compose.speculos.yml up
+#
+# Ports:
+#   5000  — REST API + web UI (http://127.0.0.1:5000)
+#   9999  — APDU TCP server
+#   41000 — VNC server
+
+services:
+  speculos:
+    image: ghcr.io/ledgerhq/speculos
+    container_name: speculos-eth
+    volumes:
+      - ./submodules/speculos/apps:/speculos/apps:ro
+    ports:
+      - "127.0.0.1:5000:5000"
+      - "127.0.0.1:9999:9999"
+      - "127.0.0.1:41000:41000"
+    command: >-
+      --model nanosp
+      ./apps/nanosp-ethereum.elf
+      --display headless
+      --apdu-port 9999
+      --vnc-port 41000
+    restart: unless-stopped

@@ -10,8 +10,15 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ACTIVE_CHAIN_ID, PROTOCOLS, TOKENS, SEPOLIA_TOKENS } from "./lib/constants.js";
+import { sepolia } from "viem/chains";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+const sampleErc20 =
+  ACTIVE_CHAIN_ID === sepolia.id ? SEPOLIA_TOKENS.USDC : TOKENS.USDC;
+const sampleWeth =
+  ACTIVE_CHAIN_ID === sepolia.id ? SEPOLIA_TOKENS.WETH : TOKENS.WETH;
 
 let passed = 0;
 let failed = 0;
@@ -180,8 +187,8 @@ async function run() {
     const approveResult = await client.callTool({
       name: "approve_erc20",
       arguments: {
-        tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-        spender: "0x2626664c2603336E57B271c5C0b26F421741e481",
+        tokenAddress: sampleErc20,
+        spender: PROTOCOLS.UNISWAP_V3_ROUTER,
         amount: "100",
       },
     });
@@ -189,7 +196,7 @@ async function run() {
     assert(texts.includes("ERC-20 Approve"), "approve_erc20 returns preview");
     assert(texts.includes('"to"'), "approve_erc20 returns tx object with 'to'");
     assert(texts.includes('"data"'), "approve_erc20 returns tx object with 'data'");
-    assert(texts.includes("8453"), "approve_erc20 tx targets Base chainId");
+    assert(texts.includes(String(ACTIVE_CHAIN_ID)), `approve_erc20 tx targets chainId ${ACTIVE_CHAIN_ID}`);
     pass("approve_erc20 encoding succeeds");
   } catch (err) {
     fail(`approve_erc20 threw: ${err.message}`);
@@ -200,7 +207,7 @@ async function run() {
     const transferResult = await client.callTool({
       name: "transfer_erc20",
       arguments: {
-        tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        tokenAddress: sampleErc20,
         to: "0x0000000000000000000000000000000000000001",
         amount: "10",
       },
@@ -218,7 +225,7 @@ async function run() {
     const encodeResult = await client.callTool({
       name: "contract_encode",
       arguments: {
-        contractAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        contractAddress: sampleErc20,
         abi: '[{"type":"function","name":"transfer","stateMutability":"nonpayable","inputs":[{"name":"to","type":"address"},{"name":"amount","type":"uint256"}],"outputs":[{"name":"","type":"bool"}]}]',
         functionName: "transfer",
         args: '["0x0000000000000000000000000000000000000001", 1000000]',
@@ -237,14 +244,17 @@ async function run() {
     const aaveResult = await client.callTool({
       name: "aave_supply",
       arguments: {
-        asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        asset: sampleErc20,
         amount: "100",
       },
     });
     const texts = aaveResult.content?.map(c => c.text).join("\n") || "";
     assert(texts.includes("Aave V3 Supply"), "aave_supply returns preview");
     assert(texts.includes('"data"'), "aave_supply returns encoded calldata");
-    assert(texts.includes("0xA238Dd80C259a72e81d7e4664a9801593F98d1c5"), "aave_supply targets correct pool");
+    assert(
+      texts.toLowerCase().includes(PROTOCOLS.AAVE_V3_POOL.toLowerCase()),
+      "aave_supply targets pool for active chain",
+    );
     pass("aave_supply encoding succeeds");
   } catch (err) {
     fail(`aave_supply threw: ${err.message}`);
@@ -255,7 +265,7 @@ async function run() {
     const borrowResult = await client.callTool({
       name: "aave_borrow",
       arguments: {
-        asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        asset: sampleErc20,
         amount: "50",
       },
     });
@@ -267,20 +277,30 @@ async function run() {
     fail(`aave_borrow threw: ${err.message}`);
   }
 
-  // uniswap_swap - encoding with optional RPC quote
+  // uniswap_swap — requires live QuoterV2 + pool on the active chain
   try {
     const swapResult = await client.callTool({
       name: "uniswap_swap",
       arguments: {
-        tokenIn: "0x4200000000000000000000000000000000000006",
-        tokenOut: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        tokenIn: sampleWeth,
+        tokenOut: sampleErc20,
         amountIn: "0.01",
       },
     });
     const texts = swapResult.content?.map(c => c.text).join("\n") || "";
-    assert(texts.includes("Uniswap V3 Swap"), "uniswap_swap returns preview");
-    assert(texts.includes('"data"'), "uniswap_swap returns encoded calldata");
-    assert(texts.includes("0x2626664c2603336E57B271c5C0b26F421741e481"), "uniswap_swap targets correct router");
+    if (swapResult.isError) {
+      assert(
+        texts.includes("QuoterV2") || texts.includes("quote") || texts.includes("Router:"),
+        "uniswap_swap fails closed with quote/router context",
+      );
+    } else {
+      assert(texts.includes("Uniswap V3 Swap"), "uniswap_swap returns preview");
+      assert(texts.includes('"data"'), "uniswap_swap returns encoded calldata");
+      assert(
+        texts.toLowerCase().includes(PROTOCOLS.UNISWAP_V3_ROUTER.toLowerCase()),
+        "uniswap_swap targets chain router",
+      );
+    }
     pass("uniswap_swap encoding succeeds");
   } catch (err) {
     fail(`uniswap_swap threw: ${err.message}`);

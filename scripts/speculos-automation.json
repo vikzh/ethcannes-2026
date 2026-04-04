@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "text": "Accept and send",
+      "actions": [
+        ["button", 1, true],
+        ["button", 2, true],
+        ["button", 1, false],
+        ["button", 2, false]
+      ]
+    },
+    {
+      "text": "Accept",
+      "actions": [
+        ["button", 1, true],
+        ["button", 2, true],
+        ["button", 1, false],
+        ["button", 2, false]
+      ]
+    },
+    {
+      "text": "Approve",
+      "actions": [
+        ["button", 1, true],
+        ["button", 2, true],
+        ["button", 1, false],
+        ["button", 2, false]
+      ]
+    },
+    {
+      "text": "Sign",
+      "actions": [
+        ["button", 1, true],
+        ["button", 2, true],
+        ["button", 1, false],
+        ["button", 2, false]
+      ]
+    },
+    {
+      "text": "Confirm",
+      "actions": [
+        ["button", 1, true],
+        ["button", 2, true],
+        ["button", 1, false],
+        ["button", 2, false]
+      ]
+    },
+    {
+      "regexp": ".*",
+      "conditions": [],
+      "actions": [
+        ["button", 2, true],
+        ["button", 2, false]
+      ]
+    }
+  ]
+}
