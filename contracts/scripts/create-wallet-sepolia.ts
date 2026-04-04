@@ -123,17 +123,19 @@ export async function createWalletSepolia(): Promise<CreateWalletResult> {
     console.log(`- agent funding (wei): ${agentFundWei}`);
   }
 
-  const tx = await factory.deployAccount(salt, policyHookAddress, modules, agentAddress, {
+  const tx = await factory.deployAccount(
+    salt,
+    policyHookAddress,
+    modules,
+    agentAddress,
+    installAgentValidator ? agentSessionValidatorAddress : ethers.ZeroAddress,
+    {
     value: agentFundWei,
   });
   const receipt = await tx.wait();
   if (!receipt) throw new Error("Missing deployment tx receipt");
 
   const account = await ethers.getContractAt("IsolatedAccount", predicted, owner);
-  if (installAgentValidator) {
-    const setTx = await account.setAgentSessionValidator(agentSessionValidatorAddress);
-    await setTx.wait();
-  }
 
   if (targetOwnerAddress.toLowerCase() !== deployerAddress.toLowerCase()) {
     const transferTx = await account.transferOwnership(targetOwnerAddress);

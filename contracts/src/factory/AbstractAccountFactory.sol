@@ -2,6 +2,11 @@
 pragma solidity ^0.8.27;
 
 import { IsolatedAccount } from "../accounts/IsolatedAccount.sol";
+import { IAgentSessionValidator } from "../interfaces/IAgentSessionValidator.sol";
+
+interface IIsolatedAccountView {
+    function agentSessionValidator() external view returns (address);
+}
 
 /// @notice Minimal factory for deploying isolated modular accounts.
 /// @dev Uses CREATE2 for deterministic addresses and supports optional
@@ -20,6 +25,8 @@ contract AbstractAccountFactory {
         address policyHook
     );
     event AgentWalletBound(address indexed agent, address indexed account);
+    event AgentWalletUnbound(address indexed agent, address indexed account);
+    event AgentWalletSynced(address indexed account, address indexed oldAgent, address indexed newAgent);
     event UserWalletBound(address indexed user, address indexed account);
     event AgentFunded(address indexed agent, uint256 amount);
 
@@ -28,9 +35,12 @@ contract AbstractAccountFactory {
     error DeploymentFailed();
     error AgentFundingTransferFailed(address agent, uint256 amount);
     error AgentAlreadyHasWallet(address agent, address existingAccount);
+    error AgentSessionValidatorNotInstalled(address validator);
+    error AgentSessionValidatorMissing(address account);
 
     mapping(address agent => address account) private _walletByAgent;
     mapping(address user => address[]) private _walletsByUser;
+    mapping(address account => address agent) private _agentByWallet;
 
     /// @notice Deploys a new account with CREATE2 and optional module setup.
     /// @param salt CREATE2 salt.
@@ -40,7 +50,8 @@ contract AbstractAccountFactory {
         bytes32 salt,
         address policyHook,
         ModuleInit[] calldata modules,
-        address agent
+        address agent,
+        address agentSessionValidator
     ) external payable returns (address account) {
         if (agent == address(0)) revert ZeroAgentAddress();
         address user = msg.sender;
@@ -61,10 +72,17 @@ contract AbstractAccountFactory {
             if (modules[i].module == address(0)) revert ZeroModuleAddress();
             deployed.installModule(modules[i].module, modules[i].initData);
         }
+        if (agentSessionValidator != address(0)) {
+            if (!deployed.isModuleInstalled(agentSessionValidator)) {
+                revert AgentSessionValidatorNotInstalled(agentSessionValidator);
+            }
+            deployed.setAgentSessionValidator(agentSessionValidator);
+        }
         deployed.transferOwnership(msg.sender);
 
         account = address(deployed);
         _walletByAgent[agent] = account;
+        _agentByWallet[account] = agent;
         _walletsByUser[user].push(account);
 
         if (msg.value > 0) {
@@ -82,6 +100,10 @@ contract AbstractAccountFactory {
         return _walletByAgent[agent];
     }
 
+    function getAgentByWallet(address account) external view returns (address agent) {
+        return _agentByWallet[account];
+    }
+
     function getWalletByUser(address user) external view returns (address account) {
         uint256 len = _walletsByUser[user].length;
         if (len == 0) return address(0);
@@ -90,6 +112,39 @@ contract AbstractAccountFactory {
 
     function getWalletsByUser(address user) external view returns (address[] memory accounts) {
         return _walletsByUser[user];
+    }
+
+    /// @notice Syncs agent->wallet registry using the account's current session in its validator.
+    /// @dev Must be called by the account itself (e.g. through account.execute(...)).
+    ///      If the session has no agent key or is revoked, the agent binding is cleared.
+    function syncAgentWallet() external {
+        address account = msg.sender;
+        address validator = IIsolatedAccountView(account).agentSessionValidator();
+        if (validator == address(0)) revert AgentSessionValidatorMissing(account);
+
+        IAgentSessionValidator.Session memory session =
+            IAgentSessionValidator(validator).getSession(account);
+        address desiredAgent = session.revoked ? address(0) : session.agentKey;
+        address oldAgent = _agentByWallet[account];
+
+        if (oldAgent == desiredAgent) return;
+
+        if (oldAgent != address(0) && _walletByAgent[oldAgent] == account) {
+            delete _walletByAgent[oldAgent];
+            emit AgentWalletUnbound(oldAgent, account);
+        }
+
+        if (desiredAgent != address(0)) {
+            address existing = _walletByAgent[desiredAgent];
+            if (existing != address(0) && existing != account) {
+                revert AgentAlreadyHasWallet(desiredAgent, existing);
+            }
+            _walletByAgent[desiredAgent] = account;
+            emit AgentWalletBound(desiredAgent, account);
+        }
+
+        _agentByWallet[account] = desiredAgent;
+        emit AgentWalletSynced(account, oldAgent, desiredAgent);
     }
 
     /// @notice Computes deterministic account address for given salt and policy hook.
