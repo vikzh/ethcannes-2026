@@ -7,6 +7,14 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { registerUniswapTools } from "./tools/uniswap.js";
+import { registerAaveTools } from "./tools/aave.js";
+import { registerBalanceTools } from "./tools/balance.js";
+import { registerTokenTools } from "./tools/token.js";
+import { registerContractTools } from "./tools/contract.js";
+import { registerTransactionTools } from "./tools/transaction.js";
+import { PROTOCOLS, TOKENS } from "./lib/constants.js";
+
 const WALLET_NAME = process.env.AGENT_WALLET_NAME || "agent-wallet";
 const KEY_FILE = join(homedir(), ".ows", `${WALLET_NAME}.key`);
 
@@ -36,7 +44,6 @@ function owsExec(args, apiKey) {
   });
 }
 
-// Resolve wallet address at startup for instructions
 async function resolveWalletAddress() {
   try {
     const apiKey = await readApiKey();
@@ -53,30 +60,77 @@ const agentAddress = await resolveWalletAddress();
 const server = new McpServer(
   {
     name: "agent-wallet",
-    version: "0.1.0",
+    version: "0.2.0",
   },
   {
     instructions: [
-      `You have an on-chain agent wallet managed by OWS.`,
+      `You have an on-chain agent wallet managed by OWS with DeFi capabilities.`,
       ``,
       `Wallet name: ${WALLET_NAME}`,
       `Agent address: ${agentAddress}`,
       `Chain: Base (eip155:8453)`,
       ``,
-      `Available tools:`,
-      `- sign_message: Sign a message with the agent wallet. Pass "message" (string) and optional "chain" (default: "base"). Returns signature hex.`,
-      `- get_address: Get the agent wallet's EVM address. No parameters.`,
+      `== DeFi Tools ==`,
       ``,
-      `Available prompts:`,
-      `- uniswap-swap: Generate a Uniswap V3 swap calldata for signing. Returns a pre-built message to sign.`,
+      `Uniswap V3 (Router: ${PROTOCOLS.UNISWAP_V3_ROUTER}):`,
+      `- uniswap_swap: Encode a swap transaction. Returns tx for send_transaction.`,
+      `- uniswap_quote: Get a price quote without executing.`,
       ``,
-      `Security: All signing is performed through this MCP server. Never call OWS directly.`,
-      `Transactions are restricted by on-chain AA policies.`,
+      `Aave V3 (Pool: ${PROTOCOLS.AAVE_V3_POOL}):`,
+      `- aave_supply: Encode a supply/deposit transaction.`,
+      `- aave_withdraw: Encode a withdrawal transaction.`,
+      `- aave_borrow: Encode a borrow transaction.`,
+      `- aave_repay: Encode a repayment transaction.`,
+      `- aave_get_user_data: Read account health factor, collateral, debt.`,
+      `- aave_get_reserves: List available Aave markets.`,
+      ``,
+      `Tokens & Balances:`,
+      `- get_balance: Check native ETH and ERC-20 balances.`,
+      `- get_token_info: Read token metadata (name, symbol, decimals).`,
+      `- approve_erc20: Encode an approval (required before swap/supply).`,
+      `- transfer_erc20: Encode a token transfer.`,
+      ``,
+      `Generic Contract Interaction:`,
+      `- contract_read: Call any view/pure function on any contract.`,
+      `- contract_encode: Encode calldata for any function.`,
+      ``,
+      `Transaction Execution:`,
+      `- send_transaction: Sign and broadcast an encoded tx on Base. Supports optional nonce and gas overrides for replacing stuck txs.`,
+      `- cancel_transaction: Cancel a stuck tx by re-sending at the same nonce with higher gas.`,
+      `- get_pending_nonce: Check if any transactions are stuck in the mempool.`,
+      `- get_transaction: Look up a transaction by hash.`,
+      ``,
+      `Wallet:`,
+      `- sign_message: Sign arbitrary data with the agent wallet.`,
+      `- get_address: Get the agent wallet address.`,
+      ``,
+      `== Common Token Addresses (Base) ==`,
+      `WETH:  ${TOKENS.WETH}`,
+      `USDC:  ${TOKENS.USDC}`,
+      `USDT:  ${TOKENS.USDT}`,
+      `DAI:   ${TOKENS.DAI}`,
+      `cbETH: ${TOKENS.cbETH}`,
+      `wstETH: ${TOKENS.wstETH}`,
+      ``,
+      `== Typical Workflow ==`,
+      `1. Check balance: get_balance`,
+      `2. Approve token: approve_erc20 (token -> protocol)`,
+      `3. Build tx: uniswap_swap / aave_supply / contract_encode`,
+      `4. Execute: send_transaction with the returned tx object`,
+      `5. Verify: get_transaction with the returned hash`,
+      ``,
+      `== If a transaction is stuck ==`,
+      `1. get_pending_nonce — check if nonces are blocked`,
+      `2. cancel_transaction with the stuck nonce — clears the queue`,
+      `3. Retry the original transaction`,
+      ``,
+      `Security: All signing is performed through this MCP server via OWS.`,
+      `Transactions are restricted by on-chain AA policies (whitelists, spend limits).`,
     ].join("\n"),
   }
 );
 
-// --- Tools ---
+// --- Core wallet tools ---
 
 server.tool(
   "sign_message",
@@ -120,27 +174,33 @@ server.tool(
   }
 );
 
-// --- Prompts ---
+// --- DeFi tools ---
+
+registerUniswapTools(server, agentAddress);
+registerAaveTools(server, agentAddress);
+registerBalanceTools(server, agentAddress);
+registerTokenTools(server, agentAddress);
+registerContractTools(server);
+registerTransactionTools(server, { owsExec, readApiKey, walletName: WALLET_NAME, agentAddress });
+
+// --- Legacy prompt (kept for backwards compat) ---
 
 server.prompt(
   "uniswap-swap",
-  "Generate a Uniswap V3 swap calldata for signing. Returns a pre-built message representing a swap on Base. Swaps WETH to USDC (0.01 ETH) on Base by default.",
+  "[DEPRECATED: use uniswap_swap tool instead] Generate a Uniswap V3 swap calldata for signing.",
   {
     tokenIn: z.string().optional().describe("Input token address (default: WETH on Base)"),
     tokenOut: z.string().optional().describe("Output token address (default: USDC on Base)"),
     amountIn: z.string().optional().describe("Amount of input token (default: 0.01)"),
   },
   async ({ tokenIn, tokenOut, amountIn }) => {
-    tokenIn = tokenIn || "0x4200000000000000000000000000000000000006";
-    tokenOut = tokenOut || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+    tokenIn = tokenIn || TOKENS.WETH;
+    tokenOut = tokenOut || TOKENS.USDC;
     amountIn = amountIn || "0.01";
-    // Build a deterministic swap calldata payload for signing.
-    // This is a simplified representation -- in production the frontend
-    // would build the actual Uniswap V3 Router calldata.
     const swapPayload = JSON.stringify({
       action: "uniswap-v3-swap",
       chain: "base",
-      router: "0x2626664c2603336E57B271c5C0b26F421741e481",
+      router: PROTOCOLS.UNISWAP_V3_ROUTER,
       params: {
         tokenIn,
         tokenOut,
@@ -161,6 +221,8 @@ server.prompt(
           content: {
             type: "text",
             text: [
+              `NOTE: This prompt is deprecated. Use the uniswap_swap tool for real calldata encoding.`,
+              ``,
               `Sign the following Uniswap V3 swap payload using the sign_message tool:`,
               ``,
               swapPayload,

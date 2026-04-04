@@ -1,10 +1,11 @@
 {
   "name": "agent-wallet-mcp",
-  "version": "0.1.0",
-  "description": "MCP server for agent wallet signing via OWS",
+  "version": "0.2.0",
+  "description": "MCP server for agent wallet signing and DeFi operations via OWS",
   "main": "index.js",
   "type": "module",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.1"
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "viem": "^2.27.0"
   }
 }
