@@ -102,7 +102,7 @@ describe("WhitelistFlowIsolated (integration)", () => {
     const sigBlocked = await signExecute(agent, account, buildMode(CALLTYPE_SINGLE), preApproveExec, 0n, 0n);
     await expect(
       account.executeAuthorized(buildMode(CALLTYPE_SINGLE), preApproveExec, 0n, 0n, sigBlocked)
-    ).to.be.revertedWithCustomError(hook, "NotWhitelisted");
+    ).to.be.revertedWithCustomError(account, "PolicyPreCheckFailed");
 
     // Agent requests new whitelist tuple.
     const requestCall = whitelistModule.interface.encodeFunctionData("requestWhitelistAddition", [

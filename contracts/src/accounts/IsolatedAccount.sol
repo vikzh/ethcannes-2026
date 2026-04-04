@@ -32,6 +32,8 @@ contract IsolatedAccount is EIP712 {
     error AgentSessionInvalid(address signer);
     error UnsupportedMode(bytes1 callType);
     error InvalidExecutionCalldata();
+    error PolicyPreCheckFailed(bytes revertData);
+    error PolicyPostCheckFailed(bytes revertData);
     error ModuleAlreadyInstalled(address module);
     error ModuleNotInstalled(address module);
 
@@ -209,12 +211,19 @@ contract IsolatedAccount is EIP712 {
         bytes memory msgData
     ) internal returns (bytes memory hookData) {
         if (policyHook == address(0)) return "";
-        return IPolicyHook(policyHook).preCheck(msgSender, msgValue, msgData);
+        (bool ok, bytes memory ret) = policyHook.call(
+            abi.encodeWithSelector(bytes4(keccak256("preCheck(address,uint256,bytes)")), msgSender, msgValue, msgData)
+        );
+        if (!ok) revert PolicyPreCheckFailed(ret);
+        return abi.decode(ret, (bytes));
     }
 
     function _runPostCheck(bytes memory hookData) internal {
         if (policyHook == address(0)) return;
-        IPolicyHook(policyHook).postCheck(hookData);
+        (bool ok, bytes memory ret) = policyHook.call(
+            abi.encodeWithSelector(bytes4(keccak256("postCheck(bytes)")), hookData)
+        );
+        if (!ok) revert PolicyPostCheckFailed(ret);
     }
 
     function _execute(bytes32 mode, bytes memory executionCalldata, uint256 nonceForEvent, bytes32 executionHash)
