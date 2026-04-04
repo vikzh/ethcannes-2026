@@ -216,6 +216,8 @@ export function DashboardApp() {
   const [addRulePrefill, setAddRulePrefill] = useState<RulePrefill | undefined>(undefined);
   const [showCreateAccount, setShowCreateAccount] = useState(false);
   const [removingRuleId, setRemovingRuleId] = useState<string | null>(null);
+  const [policyStatusFilter, setPolicyStatusFilter] = useState<Set<"active" | "inactive">>(() => new Set(["active"]));
+  const [policyActionFilter, setPolicyActionFilter] = useState<Set<string>>(() => new Set());
   const reloadRules = useCallback(() => setHomeReloadKey((k) => k + 1), []);
 
   const { writeContract: writeRemoveRule, data: removeRuleTxHash, reset: resetRemoveRule } = useWriteContract();
@@ -546,13 +548,74 @@ export function DashboardApp() {
                   </div>
                 )}
 
-                {account.policyRules.length > 0 && (
+                {account.policyRules.length > 0 && (() => {
+                  const actionTypes = [...new Set(account.policyRules.map((p) => p.actionLabel))];
+                  const activeActions = policyActionFilter.size > 0 ? policyActionFilter : new Set(actionTypes);
+                  const filtered = account.policyRules.filter((p) => {
+                    const statusMatch = policyStatusFilter.has(p.active ? "active" : "inactive");
+                    const actionMatch = activeActions.has(p.actionLabel);
+                    return statusMatch && actionMatch;
+                  });
+                  const toggleStatus = (s: "active" | "inactive") => {
+                    setPolicyStatusFilter((prev) => {
+                      const next = new Set(prev);
+                      next.has(s) ? next.delete(s) : next.add(s);
+                      return next;
+                    });
+                  };
+                  const toggleAction = (a: string) => {
+                    setPolicyActionFilter((prev) => {
+                      const base = prev.size > 0 ? prev : new Set(actionTypes);
+                      const next = new Set(base);
+                      next.has(a) ? next.delete(a) : next.add(a);
+                      return next;
+                    });
+                  };
+                  return (
                   <div className="mt-6">
                     <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">
                       Policy Rules
                     </h3>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-zinc-400">Status:</span>
+                      {(["active", "inactive"] as const).map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => toggleStatus(s)}
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                            policyStatusFilter.has(s)
+                              ? s === "active" ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-700"
+                              : "bg-zinc-50 text-zinc-400 hover:bg-zinc-100"
+                          }`}
+                        >
+                          {s === "active" ? "Active" : "Inactive"}
+                        </button>
+                      ))}
+                      {actionTypes.length > 1 && (
+                        <>
+                          <span className="ml-2 text-xs text-zinc-400">Action:</span>
+                          {actionTypes.map((a) => (
+                            <button
+                              key={a}
+                              type="button"
+                              onClick={() => toggleAction(a)}
+                              className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                                activeActions.has(a)
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-zinc-50 text-zinc-400 hover:bg-zinc-100"
+                              }`}
+                            >
+                              {a}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </div>
                     <div className="mt-3 space-y-3">
-                      {account.policyRules.map((policy) => (
+                      {filtered.length === 0 ? (
+                        <p className="py-4 text-center text-sm text-zinc-400">No rules match the selected filters</p>
+                      ) : filtered.map((policy) => (
                         <section
                           key={policy.id}
                           className="rounded-2xl border border-blue-200 bg-blue-50/50 p-5"
@@ -637,7 +700,8 @@ export function DashboardApp() {
                       ))}
                     </div>
                   </div>
-                )}
+                  );
+                })()}
               </div>
             </article>
           ))}
