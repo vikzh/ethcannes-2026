@@ -32,7 +32,7 @@ export function Header() {
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200 px-5">
       <Link href="/" className="flex items-center gap-3">
         <Image
-          src="/logo2.png"
+          src="/logo3.png"
           alt="Wallet Console logo"
           width={120}
           height={80}
