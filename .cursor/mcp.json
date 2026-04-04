@@ -4,9 +4,8 @@
       "command": "node",
       "args": ["installer/mcp-server/index.js"],
       "env": {
-        "AA_ACCOUNT_ADDRESS": "0x4f61DEb35d40A1718a0d15986dEAc9e832D75368",
-        "AA_CHAIN_ID": "11155111",
-        "WHITELIST_REQUEST_MODULE": "0xFfd1c1Eb7F68C1F1EEAee18a30289d7fbBbD2e35"
+        "FACTORY_ADDRESS": "0x44BE1CC44e2AE7420cA347Ef2CC93A4021a5B8f3",
+        "AA_CHAIN_ID": "11155111"
       }
     }
   }
