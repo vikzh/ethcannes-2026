@@ -286,7 +286,9 @@ export function DashboardApp() {
         if (!cancelled) {
           setAccountData(null);
           setAccountLoading(false);
-          setAccountChecked(true);
+          // Do NOT set accountChecked = true on error — that would
+          // trigger a false redirect to /onboard when the subgraph
+          // is simply unreachable (rate-limited, down, etc.).
         }
       });
     return () => { cancelled = true; };
