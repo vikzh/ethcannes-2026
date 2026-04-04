@@ -39,4 +39,9 @@ info "Installing dependencies..."
 
 info "Starting installer..."
 printf "\n"
-exec bash "${INSTALL_DIR}/install.sh" "$@"
+# When piped (curl | bash), stdin is the pipe -- reattach to terminal for interactive prompts
+if [[ ! -t 0 ]] && [[ -e /dev/tty ]]; then
+  exec bash "${INSTALL_DIR}/install.sh" "$@" </dev/tty
+else
+  exec bash "${INSTALL_DIR}/install.sh" "$@"
+fi

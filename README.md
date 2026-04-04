@@ -5,6 +5,12 @@
 Set up an on-chain agent wallet with DeFi capabilities (Uniswap, Aave, ERC-20) on Base. The installer creates an OWS wallet, configures chain policies, and registers an MCP server with your AI coding agents (OpenClaw, Claude Code/Cowork, Codex).
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/vikzh/ethcannes-2026/main/installer/get.sh | bash
+```
+
+Or from a local clone:
+
+```bash
 ./installer/install.sh
 ```
 

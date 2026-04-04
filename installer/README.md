@@ -5,6 +5,12 @@ Interactive CLI installer for setting up an OWS (Open Wallet Standard) agent wal
 ## Quick Start
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/vikzh/ethcannes-2026/main/installer/get.sh | bash
+```
+
+Or from a local clone:
+
+```bash
 ./installer/install.sh
 ```
 
@@ -20,6 +26,7 @@ Choose **Custom install** (option 2) to pick a wallet name and select which agen
 - **macOS** (Darwin only)
 - **Node.js** (for the MCP server)
 - **OWS** (installed automatically if missing)
+- **curl** and **tar** (for the one-liner install)
 
 ## What It Does
 
