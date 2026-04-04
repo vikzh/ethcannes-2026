@@ -18,7 +18,7 @@ function AddressAvatar({ address }: { address: string }) {
   const h = Math.abs(hash) % 360;
   return (
     <div
-      className="h-9 w-9 shrink-0 rounded-full ring-1 ring-white/20"
+      className="h-9 w-9 shrink-0 rounded-full ring-1 ring-zinc-200"
       style={{
         background: `linear-gradient(135deg, hsl(${h}, 72%, 42%), hsl(${(h + 48) % 360}, 62%, 36%))`,
       }}
@@ -29,7 +29,7 @@ function AddressAvatar({ address }: { address: string }) {
 
 export function Header() {
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-[#0f3c97] bg-[#031B5A] px-5 text-[#F4F8FF] shadow-[0_18px_48px_-36px_rgba(2,13,46,0.85)]">
+    <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200 px-5">
       <Link href="/" className="flex items-center gap-3">
         <Image
           src="/logo2.png"
@@ -38,8 +38,8 @@ export function Header() {
           height={80}
           className="h-9 w-auto object-contain"
         />
-        <span className="text-lg font-semibold tracking-tight text-[#F4F8FF]">
-          Safe wallet for<span className="text-[#8CEFFF]"> AI agents</span>
+        <span className="text-lg font-semibold tracking-tight">
+          Safe wallet for<span className="text-zinc-500"> AI agents</span>
         </span>
       </Link>
       <div className="flex items-center gap-2">
@@ -58,7 +58,7 @@ export function Header() {
                 <button
                   type="button"
                   onClick={openConnectModal}
-                  className="flex items-center gap-2 rounded-full border border-[#19D9FF]/40 bg-[linear-gradient(90deg,_#37B6FF_0%,_#19D9FF_100%)] px-4 py-2 text-sm font-semibold text-[#031B5A] shadow-[0_16px_30px_-18px_rgba(25,217,255,0.8)] transition-transform hover:-translate-y-0.5"
+                  className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 shadow-sm hover:bg-zinc-50"
                 >
                   Connect wallet
                 </button>
@@ -68,14 +68,14 @@ export function Header() {
               <button
                 type="button"
                 onClick={openAccountModal}
-                className="flex max-w-[min(100vw-8rem,320px)] items-center gap-2 rounded-full border border-white/15 bg-white/8 py-1 pl-1 pr-3 text-sm text-[#F4F8FF] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-colors hover:bg-white/12"
+                className="flex max-w-[min(100vw-8rem,320px)] items-center gap-2 rounded-full border border-zinc-200 bg-white py-1 pl-1 pr-3 text-sm shadow-sm hover:bg-zinc-50"
               >
                 <AddressAvatar address={account.address} />
-                <span className="truncate font-mono text-xs text-[#F4F8FF]">
+                <span className="truncate font-mono text-xs text-zinc-700">
                   {chain.name?.slice(0, 3)}:{shortAddress(account.address)}
                 </span>
                 <span
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[linear-gradient(90deg,_#37B6FF_0%,_#19D9FF_100%)] text-[10px] font-bold text-[#031B5A]"
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-blue-600 text-[10px] font-bold text-white"
                   title={chain.name}
                 >
                   ◆

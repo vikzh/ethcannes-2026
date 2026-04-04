@@ -71,10 +71,10 @@ async function fetchChangelog(
 }
 
 const EVENT_STYLES: Record<ChangelogEvent["type"], { bg: string; text: string; label: string }> = {
-  account_created: { bg: "bg-[#E9F5FF]", text: "text-[#082A73]", label: "Created" },
-  rule_created: { bg: "bg-[#FFF3DF]", text: "text-[#B66A00]", label: "Requested" },
-  rule_approved: { bg: "bg-[#E8FFF7]", text: "text-[#028A63]", label: "Approved" },
-  rule_updated: { bg: "bg-[#EEF4FF]", text: "text-[#475569]", label: "Updated" },
+  account_created: { bg: "bg-blue-50", text: "text-blue-700", label: "Created" },
+  rule_created: { bg: "bg-amber-50", text: "text-amber-700", label: "Requested" },
+  rule_approved: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Approved" },
+  rule_updated: { bg: "bg-zinc-100", text: "text-zinc-700", label: "Updated" },
 };
 
 async function fetchAccountsByOwner(
@@ -131,8 +131,8 @@ function NavItem({
       onClick={onClick}
       className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
         active
-          ? "border border-[#D9E4FF] bg-white font-semibold text-[#031B5A] shadow-[0_12px_24px_-20px_rgba(8,42,115,0.4)]"
-          : "text-[#475569] hover:bg-white/80 hover:text-[#031B5A]"
+          ? "bg-zinc-100 font-medium text-zinc-900"
+          : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
       }`}
     >
       <Icon className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
@@ -285,9 +285,9 @@ export function DashboardApp() {
   const renderHomePanel = () => {
     if (homeLoading) {
       return (
-        <div className="flex min-h-[420px] w-full items-center justify-center rounded-[28px] border border-[#D9E4FF] bg-white/95 px-8 py-12 shadow-[0_24px_80px_-52px_rgba(8,42,115,0.28)]">
-          <div className="flex items-center gap-3 text-sm text-[#475569]">
-            <LoaderCircle className="h-5 w-5 animate-spin text-[#082A73]" />
+        <div className="flex min-h-[420px] w-full items-center justify-center rounded-[28px] border border-zinc-200 bg-white/90 px-8 py-12 shadow-[0_24px_80px_-48px_rgba(0,0,0,0.55)]">
+          <div className="flex items-center gap-3 text-sm text-zinc-600">
+            <LoaderCircle className="h-5 w-5 animate-spin text-zinc-900" />
             Loading graph data for this owner address...
           </div>
         </div>
@@ -296,18 +296,18 @@ export function DashboardApp() {
 
     if (homeError) {
       return (
-        <div className="w-full max-w-3xl rounded-[28px] border border-[#FFD3DB] bg-[#FFF5F8] p-8 shadow-[0_24px_80px_-52px_rgba(8,42,115,0.22)]">
+        <div className="w-full max-w-3xl rounded-[28px] border border-rose-200 bg-rose-50/80 p-8 shadow-[0_24px_80px_-48px_rgba(0,0,0,0.55)]">
           <div className="flex items-start gap-3">
-            <CircleAlert className="mt-0.5 h-5 w-5 text-[#FF5F7A]" />
+            <CircleAlert className="mt-0.5 h-5 w-5 text-rose-600" />
             <div>
-              <h2 className="text-lg font-semibold text-[#0F172A]">
+              <h2 className="text-lg font-semibold text-zinc-900">
                 Graph data is unavailable
               </h2>
-              <p className="mt-2 text-sm text-[#475569]">{homeError}</p>
+              <p className="mt-2 text-sm text-zinc-600">{homeError}</p>
               <button
                 type="button"
                 onClick={() => setHomeReloadKey((current) => current + 1)}
-                className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#D9E4FF] bg-white px-4 py-2 text-sm font-medium text-[#031B5A] transition-colors hover:bg-[#EEF4FF]"
+                className="mt-5 inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-50"
               >
                 <RefreshCw className="h-4 w-4" />
                 Retry
@@ -322,11 +322,11 @@ export function DashboardApp() {
       <div className="w-full max-w-4xl space-y-6">
         <div className="grid gap-4">
           {homeAccounts.length === 0 ? (
-            <div className="rounded-[28px] border border-[#D9E4FF] bg-white p-8 text-center shadow-[0_20px_70px_-56px_rgba(8,42,115,0.28)]">
-              <h2 className="text-xl font-semibold tracking-tight text-[#0F172A]">
+            <div className="rounded-[28px] border border-zinc-200 bg-white p-8 text-center shadow-[0_20px_70px_-52px_rgba(0,0,0,0.55)]">
+              <h2 className="text-xl font-semibold tracking-tight text-zinc-950">
                 No accounts indexed for this owner
               </h2>
-              <p className="mt-2 text-sm text-[#475569]">
+              <p className="mt-2 text-sm text-zinc-600">
                 The connected wallet does not currently have any accounts in the
                 subgraph for this owner address.
               </p>
@@ -335,30 +335,30 @@ export function DashboardApp() {
           {homeAccounts.map((account, index) => (
             <article
               key={account.id}
-              className="overflow-hidden rounded-[30px] border border-[#D9E4FF] bg-white shadow-[0_24px_72px_-56px_rgba(8,42,115,0.34)]"
+              className="overflow-hidden rounded-[30px] border border-zinc-200 bg-white shadow-[0_20px_70px_-52px_rgba(0,0,0,0.55)]"
             >
-              <div className="border-b border-[#D9E4FF] bg-[linear-gradient(135deg,_#FFFFFF_0%,_#EEF4FF_100%)] p-6">
+              <div className="border-b border-zinc-200 bg-[linear-gradient(135deg,_rgba(244,244,245,0.95),_rgba(255,255,255,1))] p-6">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#64748B]">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
                       Account
                     </p>
-                    <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#0F172A]">
+                    <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950">
                       Account {index + 1}
                     </h2>
-                    <p className="mt-2 text-sm text-[#475569]">
+                    <p className="mt-2 text-sm text-zinc-600">
                       Approved actions available for this account.
                     </p>
                   </div>
                   <div className="flex items-center gap-2 self-start">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-[#E8FFF7] px-3 py-1 text-xs font-medium text-[#028A63] ring-1 ring-[#B2F7DD]">
+                    <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
                       <ShieldCheck className="h-4 w-4" />
                       {account.rules.length} approved rule{account.rules.length === 1 ? "" : "s"}
                     </div>
                     <button
                       type="button"
                       onClick={() => setAddRuleAccount(account)}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-[linear-gradient(90deg,_#37B6FF_0%,_#19D9FF_100%)] px-3 py-1 text-xs font-semibold text-[#031B5A] shadow-[0_16px_32px_-20px_rgba(25,217,255,0.75)] transition-transform hover:-translate-y-0.5"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-zinc-800"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       Add Rule
@@ -369,7 +369,7 @@ export function DashboardApp() {
 
               <div className="p-6">
                 {account.rules.length === 0 ? (
-                  <div className="mt-4 rounded-2xl border border-dashed border-[#D9E4FF] bg-[#F7FAFF] p-5 text-sm text-[#475569]">
+                  <div className="mt-4 rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-5 text-sm text-zinc-600">
                     No approved whitelist requests were found for this account.
                   </div>
                 ) : (
@@ -377,63 +377,63 @@ export function DashboardApp() {
                     {account.rules.map((rule) => (
                       <section
                         key={rule.id}
-                        className="rounded-2xl border border-[#D9E4FF] bg-[#F7FAFF] p-5"
+                        className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-5"
                       >
                         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                           <div>
-                            <div className="inline-flex rounded-full bg-[#E8FFF7] px-2.5 py-1 text-xs font-medium text-[#028A63]">
+                            <div className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
                               {rule.status}
                             </div>
-                            <h4 className="mt-3 text-base font-semibold text-[#0F172A]">
+                            <h4 className="mt-3 text-base font-semibold text-zinc-950">
                               {rule.tokenLabel}
                             </h4>
-                            <p className="mt-1 text-sm text-[#475569]">
+                            <p className="mt-1 text-sm text-zinc-600">
                               {rule.actionLabel}
                             </p>
                           </div>
-                          <div className="text-xs text-[#64748B]">
+                          <div className="text-xs text-zinc-500">
                             Updated {formatTimestamp(rule.updatedAt)}
                           </div>
                         </div>
 
                         <div className="mt-4 grid gap-3 md:grid-cols-2">
                           <div>
-                            <p className="text-xs uppercase tracking-[0.18em] text-[#64748B]">
+                            <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
                               Token Name
                             </p>
-                            <p className="mt-1 text-sm text-[#0F172A]">
+                            <p className="mt-1 text-sm text-zinc-900">
                               {rule.tokenName}
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs uppercase tracking-[0.18em] text-[#64748B]">
+                            <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
                               Description
                             </p>
-                            <p className="mt-1 text-sm text-[#0F172A]">
+                            <p className="mt-1 text-sm text-zinc-900">
                               {rule.description}
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs uppercase tracking-[0.18em] text-[#64748B]">
+                            <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
                               Max Amount
                             </p>
-                            <p className="mt-1 text-sm text-[#0F172A]">
+                            <p className="mt-1 text-sm text-zinc-900">
                               {rule.maxAmount}
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs uppercase tracking-[0.18em] text-[#64748B]">
+                            <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
                               Request Reason
                             </p>
-                            <p className="mt-1 text-sm text-[#0F172A]">
+                            <p className="mt-1 text-sm text-zinc-900">
                               {rule.metadata || "Approved whitelist rule"}
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs uppercase tracking-[0.18em] text-[#64748B]">
+                            <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
                               Created
                             </p>
-                            <p className="mt-1 text-sm text-[#0F172A]">
+                            <p className="mt-1 text-sm text-zinc-900">
                               {formatTimestamp(rule.createdAt)}
                             </p>
                           </div>
@@ -453,9 +453,9 @@ export function DashboardApp() {
   const renderChangelogPanel = () => {
     if (changelogLoading) {
       return (
-        <div className="flex min-h-[420px] w-full items-center justify-center rounded-[28px] border border-[#D9E4FF] bg-white/95 px-8 py-12 shadow-[0_24px_80px_-52px_rgba(8,42,115,0.28)]">
-          <div className="flex items-center gap-3 text-sm text-[#475569]">
-            <LoaderCircle className="h-5 w-5 animate-spin text-[#082A73]" />
+        <div className="flex min-h-[420px] w-full items-center justify-center rounded-[28px] border border-zinc-200 bg-white/90 px-8 py-12 shadow-[0_24px_80px_-48px_rgba(0,0,0,0.55)]">
+          <div className="flex items-center gap-3 text-sm text-zinc-600">
+            <LoaderCircle className="h-5 w-5 animate-spin text-zinc-900" />
             Loading changelog...
           </div>
         </div>
@@ -464,14 +464,14 @@ export function DashboardApp() {
 
     if (changelogError) {
       return (
-        <div className="w-full max-w-3xl rounded-[28px] border border-[#FFD3DB] bg-[#FFF5F8] p-8 shadow-[0_24px_80px_-52px_rgba(8,42,115,0.22)]">
+        <div className="w-full max-w-3xl rounded-[28px] border border-rose-200 bg-rose-50/80 p-8 shadow-[0_24px_80px_-48px_rgba(0,0,0,0.55)]">
           <div className="flex items-start gap-3">
-            <CircleAlert className="mt-0.5 h-5 w-5 text-[#FF5F7A]" />
+            <CircleAlert className="mt-0.5 h-5 w-5 text-rose-600" />
             <div>
-              <h2 className="text-lg font-semibold text-[#0F172A]">
+              <h2 className="text-lg font-semibold text-zinc-900">
                 Changelog unavailable
               </h2>
-              <p className="mt-2 text-sm text-[#475569]">{changelogError}</p>
+              <p className="mt-2 text-sm text-zinc-600">{changelogError}</p>
             </div>
           </div>
         </div>
@@ -480,11 +480,11 @@ export function DashboardApp() {
 
     if (changelogEntries.length === 0) {
       return (
-        <div className="w-full max-w-4xl rounded-[28px] border border-[#D9E4FF] bg-white p-8 text-center shadow-[0_20px_70px_-56px_rgba(8,42,115,0.28)]">
-          <h2 className="text-xl font-semibold tracking-tight text-[#0F172A]">
+        <div className="w-full max-w-4xl rounded-[28px] border border-zinc-200 bg-white p-8 text-center shadow-[0_20px_70px_-52px_rgba(0,0,0,0.55)]">
+          <h2 className="text-xl font-semibold tracking-tight text-zinc-950">
             No activity yet
           </h2>
-          <p className="mt-2 text-sm text-[#475569]">
+          <p className="mt-2 text-sm text-zinc-600">
             No account or rule changes have been recorded.
           </p>
         </div>
@@ -498,7 +498,7 @@ export function DashboardApp() {
           return (
             <article
               key={`${event.timestamp}-${index}`}
-              className="flex gap-4 rounded-2xl border border-[#D9E4FF] bg-white p-5 shadow-[0_16px_36px_-28px_rgba(8,42,115,0.22)]"
+              className="flex gap-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm"
             >
               <div className="flex flex-col items-center pt-0.5">
                 <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${style.bg}`}>
@@ -515,15 +515,15 @@ export function DashboardApp() {
                     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-current/20 ${style.bg} ${style.text}`}>
                       {style.label}
                     </span>
-                    <h3 className="text-sm font-semibold text-[#0F172A]">
+                    <h3 className="text-sm font-semibold text-zinc-900">
                       {event.title}
                     </h3>
                   </div>
-                  <span className="text-xs text-[#64748B]">
+                  <span className="text-xs text-zinc-500">
                     {formatTimestamp(event.timestamp)}
                   </span>
                 </div>
-                <p className="mt-1.5 text-sm text-[#475569]">
+                <p className="mt-1.5 text-sm text-zinc-600">
                   {event.description}
                 </p>
                 {event.txHash && (
@@ -531,7 +531,7 @@ export function DashboardApp() {
                     href={`https://sepolia.etherscan.io/tx/${event.txHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-2 inline-block text-xs font-medium text-[#082A73] underline decoration-[#8CEFFF] transition-colors hover:text-[#19D9FF]"
+                    className="mt-2 inline-block text-xs font-medium text-zinc-400 underline decoration-zinc-300 transition-colors hover:text-zinc-700"
                   >
                     View on Etherscan
                   </a>
@@ -545,10 +545,10 @@ export function DashboardApp() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#F7FAFF] text-[#0F172A]">
+    <div className="flex min-h-screen flex-col bg-white text-zinc-900">
       <Header />
       <div className="flex min-h-0 flex-1">
-        {hasAccount && isConnected && <aside className="flex w-[260px] shrink-0 flex-col border-r border-[#D9E4FF] bg-[#EEF4FF]/80">
+        {hasAccount && isConnected && <aside className="flex w-[260px] shrink-0 flex-col border-r border-zinc-200 bg-white">
           <div className="p-3">
             <nav className="space-y-0.5">
               <NavItem
@@ -570,8 +570,8 @@ export function DashboardApp() {
         <div className="flex min-w-0 flex-1 flex-col">
           {!hasAccount && !accountLoading ? (
             <main className="flex flex-1 items-center px-10 pb-20 pt-[8vh]" style={{ justifyContent: "left", paddingLeft: "20%" }}>
-              <div className="w-full max-w-xl rounded-[32px] border border-[#D9E4FF] bg-white px-8 py-10 shadow-[0_28px_72px_-56px_rgba(8,42,115,0.34)]">
-                <h1 className="text-2xl font-semibold leading-snug tracking-tight text-[#0F172A]">
+              <div className="w-full max-w-md">
+                <h1 className="text-2xl font-semibold leading-snug tracking-tight text-zinc-900">
                   Create a dedicated wallet<br />
                   that lets your AI agent<br />
                   make only approved transactions
@@ -584,8 +584,8 @@ export function DashboardApp() {
                     "Always allowed actions",
                     "One-time approvals",
                   ].map((item) => (
-                    <li key={item} className="flex items-center gap-2.5 text-sm text-[#475569]">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#EEF4FF] text-[10px] font-bold text-[#082A73] ring-1 ring-[#D9E4FF]">✓</span>
+                    <li key={item} className="flex items-center gap-2.5 text-sm text-zinc-600">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[10px] font-bold text-zinc-500">✓</span>
                       {item}
                     </li>
                   ))}
@@ -593,7 +593,7 @@ export function DashboardApp() {
                 <button
                   type="button"
                   onClick={() => router.push("/onboard")}
-                  className="mt-8 rounded-xl bg-[linear-gradient(90deg,_#37B6FF_0%,_#19D9FF_100%)] px-5 py-2.5 text-sm font-semibold text-[#031B5A] shadow-[0_22px_40px_-24px_rgba(25,217,255,0.7)] transition-transform hover:-translate-y-0.5"
+                  className="mt-8 rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
                 >
                   Get started
                 </button>
@@ -601,13 +601,13 @@ export function DashboardApp() {
             </main>
           ) : accountLoading ? (
             <main className="flex flex-1 items-center justify-center px-10 pb-20 pt-[8vh]">
-              <div className="flex items-center gap-3 rounded-full border border-[#D9E4FF] bg-white px-5 py-3 text-sm text-[#475569] shadow-[0_16px_36px_-28px_rgba(8,42,115,0.22)]">
-                <LoaderCircle className="h-4 w-4 animate-spin text-[#082A73]" />
+              <div className="flex items-center gap-3 rounded-full border border-zinc-200 bg-white px-5 py-3 text-sm text-zinc-600 shadow-sm">
+                <LoaderCircle className="h-4 w-4 animate-spin text-zinc-900" />
                 Checking owner account on The Graph...
               </div>
             </main>
           ) : (
-            <main className="flex-1 overflow-auto bg-[#F7FAFF] p-6">
+            <main className="flex-1 overflow-auto p-6">
               <div className="mx-auto flex min-h-full w-full max-w-5xl items-start justify-center">
                 {activeNav === "rules" ? renderHomePanel() : null}
                 {activeNav === "changelog" ? renderChangelogPanel() : null}
