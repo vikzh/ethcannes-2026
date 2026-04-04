@@ -14,6 +14,7 @@ import { registerTokenTools } from "./tools/token.js";
 import { registerContractTools } from "./tools/contract.js";
 import { registerTransactionTools } from "./tools/transaction.js";
 import { registerAccountTools } from "./tools/account.js";
+import { registerWorldIdTools } from "./tools/worldid.js";
 import { getPublicClient } from "./lib/rpc.js";
 import { PROTOCOLS, TOKENS, FACTORY_ADDRESS, ACTIVE_CHAIN_ID, explorerAddressUrl } from "./lib/constants.js";
 
@@ -164,6 +165,13 @@ const server = new McpServer(
       `- approve_erc20: Encode an approval (required before swap/supply).`,
       `- transfer_erc20: Encode a token transfer.`,
       ``,
+      `World ID (MiniKit 2.0):`,
+      `- resolve_worldid: Resolve a @username to an Ethereum address via World ID.`,
+      `  Also checks Orb verification status. When a user says "send to world id alice"`,
+      `  or "@alice", resolve the username first, then use the address.`,
+      `- lookup_worldid: Reverse-lookup an Ethereum address to a World ID username.`,
+      `- verify_worldid: Check if an address is Orb-verified on World Chain.`,
+      ``,
       `Generic Contract Interaction:`,
       `- contract_read: Call any view/pure function on any contract.`,
       `- contract_encode: Encode calldata for any function.`,
@@ -188,11 +196,12 @@ const server = new McpServer(
       ...aaInstructions,
       ``,
       `== Typical Workflow ==`,
-      `1. Check balance: get_balance`,
-      `2. Approve token: approve_erc20 (token -> protocol)`,
-      `3. Build tx: uniswap_swap / aave_supply / contract_encode`,
-      `4. Execute: send_transaction with the returned tx object`,
-      `5. Verify: get_transaction with the returned hash`,
+      `1. If the user mentions a World ID (e.g. "send to world id alice" or "@alice"): resolve_worldid to get their address`,
+      `2. Check balance: get_balance`,
+      `3. Approve token: approve_erc20 (token -> protocol)`,
+      `4. Build tx: uniswap_swap / aave_supply / transfer_erc20 / contract_encode`,
+      `5. Execute: send_transaction with the returned tx object`,
+      `6. Verify: get_transaction with the returned hash`,
       ``,
       `== If a transaction is stuck ==`,
       `1. get_pending_nonce — check if nonces are blocked`,
@@ -263,6 +272,7 @@ registerTransactionTools(server, { owsExec, readApiKey, walletName: WALLET_NAME,
 // --- AA inspection tools ---
 
 registerAccountTools(server, { owsExec, readApiKey, walletName: WALLET_NAME, agentAddress, aaAccount });
+registerWorldIdTools(server);
 
 // --- Legacy prompt (kept for backwards compat) ---
 
