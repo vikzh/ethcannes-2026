@@ -28,10 +28,9 @@ contract AbstractAccountFactory {
     error DeploymentFailed();
     error AgentFundingTransferFailed(address agent, uint256 amount);
     error AgentAlreadyHasWallet(address agent, address existingAccount);
-    error UserAlreadyHasWallet(address user, address existingAccount);
 
     mapping(address agent => address account) private _walletByAgent;
-    mapping(address user => address account) private _walletByUser;
+    mapping(address user => address[]) private _walletsByUser;
 
     /// @notice Deploys a new account with CREATE2 and optional module setup.
     /// @param salt CREATE2 salt.
@@ -45,8 +44,6 @@ contract AbstractAccountFactory {
     ) external payable returns (address account) {
         if (agent == address(0)) revert ZeroAgentAddress();
         address user = msg.sender;
-        address existingUserWallet = _walletByUser[user];
-        if (existingUserWallet != address(0)) revert UserAlreadyHasWallet(user, existingUserWallet);
 
         address existing = _walletByAgent[agent];
         if (existing != address(0)) revert AgentAlreadyHasWallet(agent, existing);
@@ -68,7 +65,7 @@ contract AbstractAccountFactory {
 
         account = address(deployed);
         _walletByAgent[agent] = account;
-        _walletByUser[user] = account;
+        _walletsByUser[user].push(account);
 
         if (msg.value > 0) {
             (bool sent, ) = agent.call{ value: msg.value }("");
@@ -86,7 +83,13 @@ contract AbstractAccountFactory {
     }
 
     function getWalletByUser(address user) external view returns (address account) {
-        return _walletByUser[user];
+        uint256 len = _walletsByUser[user].length;
+        if (len == 0) return address(0);
+        return _walletsByUser[user][len - 1];
+    }
+
+    function getWalletsByUser(address user) external view returns (address[] memory accounts) {
+        return _walletsByUser[user];
     }
 
     /// @notice Computes deterministic account address for given salt and policy hook.

@@ -37,6 +37,9 @@ describe("AbstractAccountFactory", () => {
     expect(await hook.isInitialized(predicted)).to.equal(true);
     expect(await factory.getWalletByAgent(agent.address)).to.equal(predicted);
     expect(await factory.getWalletByUser(owner.address)).to.equal(predicted);
+    const wallets = await factory.getWalletsByUser(owner.address);
+    expect(wallets.length).to.equal(1);
+    expect(wallets[0]).to.equal(predicted);
   });
 
   it("reverts for zero module address", async () => {
@@ -72,15 +75,23 @@ describe("AbstractAccountFactory", () => {
       .to.be.revertedWithCustomError(factory, "ZeroAgentAddress");
   });
 
-  it("reverts if user already has a wallet", async () => {
+  it("allows multiple wallets per user and keeps latest in getWalletByUser", async () => {
     const [, agent, otherAgent] = await ethers.getSigners();
     const salt1 = ethers.keccak256(ethers.toUtf8Bytes("aa-account-6"));
     const salt2 = ethers.keccak256(ethers.toUtf8Bytes("aa-account-7"));
     const modules = [{ module: hook.target as string, initData: "0x" }];
+    const predicted1 = await factory.predictAccountAddress(salt1, hook.target as string);
+    const predicted2 = await factory.predictAccountAddress(salt2, hook.target as string);
 
     await factory.deployAccount(salt1, hook.target as string, modules, agent.address);
     await expect(factory.deployAccount(salt2, hook.target as string, modules, otherAgent.address))
-      .to.be.revertedWithCustomError(factory, "UserAlreadyHasWallet");
+      .to.not.be.reverted;
+
+    const wallets = await factory.getWalletsByUser((await ethers.getSigners())[0].address);
+    expect(wallets.length).to.equal(2);
+    expect(wallets[0]).to.equal(predicted1);
+    expect(wallets[1]).to.equal(predicted2);
+    expect(await factory.getWalletByUser((await ethers.getSigners())[0].address)).to.equal(predicted2);
   });
 
   it("forwards attached ETH to agent wallet on deploy", async () => {
