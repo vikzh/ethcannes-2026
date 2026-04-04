@@ -1,4 +1,11 @@
-import { getDefaultConfig } from "@rainbow-me/rainbowkit";
+import { connectorsForWallets } from "@rainbow-me/rainbowkit";
+import {
+  injectedWallet,
+  metaMaskWallet,
+  coinbaseWallet,
+  walletConnectWallet,
+  ledgerWallet,
+} from "@rainbow-me/rainbowkit/wallets";
 import { createConfig, http } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { injected } from "wagmi/connectors";
@@ -14,29 +21,43 @@ const useWalletConnect =
 const sepoliaRpcUrl =
   process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL?.trim() || undefined;
 
+const chains = [sepolia] as const;
+const transports = { [sepolia.id]: http(sepoliaRpcUrl) };
+
 /**
- * Without a WalletConnect / Reown project ID we only register the injected
- * connector (MetaMask, Rabby, browser wallets). That avoids Reown’s origin
- * allowlist and the "localhost:3000 not found on Allowlist" console error.
+ * When a WalletConnect project ID is available, we show the full wallet list
+ * including Ledger, MetaMask, Coinbase, WalletConnect, and browser wallets.
+ * Ledger connects via Ledger Live through the WalletConnect protocol.
  *
- * When `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is set, add your dev origin at
- * https://cloud.reown.com (e.g. `http://localhost:3000`) or use injected-only.
+ * Without a project ID we fall back to injected-only (browser extensions).
  */
-export const wagmiConfig = useWalletConnect
-  ? getDefaultConfig({
-      appName: "Wallet Console",
-      projectId: walletConnectProjectId,
-      chains: [sepolia],
-      transports: {
-        [sepolia.id]: http(sepoliaRpcUrl),
-      },
-      ssr: true,
-    })
-  : createConfig({
-      chains: [sepolia],
-      transports: {
-        [sepolia.id]: http(sepoliaRpcUrl),
-      },
-      connectors: [injected({ shimDisconnect: true })],
-      ssr: true,
-    });
+const connectors = useWalletConnect
+  ? connectorsForWallets(
+      [
+        {
+          groupName: "Popular",
+          wallets: [
+            metaMaskWallet,
+            ledgerWallet,
+            coinbaseWallet,
+            walletConnectWallet,
+          ],
+        },
+        {
+          groupName: "Other",
+          wallets: [injectedWallet],
+        },
+      ],
+      {
+        appName: "Wallet Console",
+        projectId: walletConnectProjectId,
+      }
+    )
+  : [injected({ shimDisconnect: true })];
+
+export const wagmiConfig = createConfig({
+  chains,
+  transports,
+  connectors,
+  ssr: true,
+});
