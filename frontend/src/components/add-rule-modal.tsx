@@ -183,27 +183,27 @@ export function AddRuleModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-[#031B5A]/35 backdrop-blur-sm"
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div className="relative z-10 w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-8 shadow-2xl">
+      <div className="relative z-10 w-full max-w-lg rounded-3xl border border-[#D9E4FF] bg-white p-8 shadow-[0_32px_80px_-56px_rgba(2,13,46,0.6)]">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold tracking-tight text-zinc-900">
+          <h2 className="text-xl font-semibold tracking-tight text-[#0F172A]">
             Add Allow Rule
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+            className="rounded-full p-1.5 text-[#64748B] transition-colors hover:bg-[#EEF4FF] hover:text-[#031B5A]"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <p className="mt-2 text-sm text-zinc-500">
+        <p className="mt-2 text-sm text-[#64748B]">
           Define what your AI agent is allowed to do with this account.
         </p>
 
@@ -214,8 +214,8 @@ export function AddRuleModal({
             onClick={() => setRuleType("narrow")}
             className={`flex-1 rounded-xl border px-4 py-3 text-left text-sm transition-all ${
               ruleType === "narrow"
-                ? "border-zinc-900 bg-zinc-900 text-white"
-                : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
+                ? "border-[#19D9FF] bg-[linear-gradient(90deg,_#37B6FF_0%,_#19D9FF_100%)] text-[#031B5A] shadow-[0_18px_36px_-24px_rgba(25,217,255,0.65)]"
+                : "border-[#D9E4FF] bg-white text-[#475569] hover:border-[#8CEFFF]"
             }`}
           >
             <span className="font-medium">Restricted transfer</span>
@@ -228,8 +228,8 @@ export function AddRuleModal({
             onClick={() => setRuleType("whitelist")}
             className={`flex-1 rounded-xl border px-4 py-3 text-left text-sm transition-all ${
               ruleType === "whitelist"
-                ? "border-zinc-900 bg-zinc-900 text-white"
-                : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
+                ? "border-[#19D9FF] bg-[linear-gradient(90deg,_#37B6FF_0%,_#19D9FF_100%)] text-[#031B5A] shadow-[0_18px_36px_-24px_rgba(25,217,255,0.65)]"
+                : "border-[#D9E4FF] bg-white text-[#475569] hover:border-[#8CEFFF]"
             }`}
           >
             <span className="font-medium">Broad whitelist</span>
@@ -243,14 +243,14 @@ export function AddRuleModal({
         <div className="mt-6 space-y-4">
           {/* Token selector */}
           <div>
-            <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <label className="block text-xs font-medium uppercase tracking-wide text-[#64748B]">
               Token
             </label>
             <div className="relative mt-1.5">
               <select
                 value={selectedToken}
                 onChange={(e) => setSelectedToken(e.target.value)}
-                className="w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 pr-10 text-sm text-zinc-900 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                className="w-full appearance-none rounded-xl border border-[#D9E4FF] bg-[#F7FAFF] px-4 py-2.5 pr-10 text-sm text-[#0F172A] focus:border-[#19D9FF] focus:outline-none focus:ring-2 focus:ring-[#19D9FF]/20"
               >
                 {SEPOLIA_TOKENS.map((t) => (
                   <option key={t.address} value={t.address}>
@@ -259,14 +259,14 @@ export function AddRuleModal({
                 ))}
                 <option value={CUSTOM_TOKEN}>Custom token...</option>
               </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
             </div>
           </div>
 
           {/* Custom token address — shown only when "Custom token" is selected */}
           {isCustom && (
             <div>
-              <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
+              <label className="block text-xs font-medium uppercase tracking-wide text-[#64748B]">
                 Token contract address
               </label>
               <input
@@ -274,10 +274,10 @@ export function AddRuleModal({
                 placeholder="0x..."
                 value={customTokenAddress}
                 onChange={(e) => setCustomTokenAddress(e.target.value.trim())}
-                className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                className="mt-1.5 w-full rounded-xl border border-[#D9E4FF] bg-[#F7FAFF] px-4 py-2.5 text-sm text-[#0F172A] placeholder:text-[#64748B] focus:border-[#19D9FF] focus:outline-none focus:ring-2 focus:ring-[#19D9FF]/20"
               />
               {isValidToken && fetchedSymbol && (
-                <p className="mt-1.5 text-xs text-zinc-500">
+                <p className="mt-1.5 text-xs text-[#64748B]">
                   Detected: {fetchedName ? `${fetchedName} (${fetchedSymbol})` : fetchedSymbol} — {decimals} decimals
                 </p>
               )}
@@ -289,7 +289,7 @@ export function AddRuleModal({
             <>
               {/* Allowed destination */}
               <div>
-                <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
+                <label className="block text-xs font-medium uppercase tracking-wide text-[#64748B]">
                   Allowed destination address
                 </label>
                 <input
@@ -299,13 +299,13 @@ export function AddRuleModal({
                   onChange={(e) =>
                     setAllowedDestination(e.target.value.trim())
                   }
-                  className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                  className="mt-1.5 w-full rounded-xl border border-[#D9E4FF] bg-[#F7FAFF] px-4 py-2.5 text-sm text-[#0F172A] placeholder:text-[#64748B] focus:border-[#19D9FF] focus:outline-none focus:ring-2 focus:ring-[#19D9FF]/20"
                 />
               </div>
 
               {/* Max amount */}
               <div>
-                <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
+                <label className="block text-xs font-medium uppercase tracking-wide text-[#64748B]">
                   Max amount per period{tokenSymbol ? ` (${tokenSymbol})` : ""}
                 </label>
                 <input
@@ -317,20 +317,20 @@ export function AddRuleModal({
                     const v = e.target.value.replace(/[^0-9.]/g, "");
                     setMaxAmount(v);
                   }}
-                  className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                  className="mt-1.5 w-full rounded-xl border border-[#D9E4FF] bg-[#F7FAFF] px-4 py-2.5 text-sm text-[#0F172A] placeholder:text-[#64748B] focus:border-[#19D9FF] focus:outline-none focus:ring-2 focus:ring-[#19D9FF]/20"
                 />
               </div>
 
               {/* Period */}
               <div>
-                <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
+                <label className="block text-xs font-medium uppercase tracking-wide text-[#64748B]">
                   Period duration
                 </label>
                 <div className="relative mt-1.5">
                   <select
                     value={periodIndex}
                     onChange={(e) => setPeriodIndex(Number(e.target.value))}
-                    className="w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 pr-10 text-sm text-zinc-900 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                    className="w-full appearance-none rounded-xl border border-[#D9E4FF] bg-[#F7FAFF] px-4 py-2.5 pr-10 text-sm text-[#0F172A] focus:border-[#19D9FF] focus:outline-none focus:ring-2 focus:ring-[#19D9FF]/20"
                   >
                     {PERIOD_OPTIONS.map((opt, i) => (
                       <option key={opt.seconds} value={i}>
@@ -338,7 +338,7 @@ export function AddRuleModal({
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
                 </div>
               </div>
             </>
@@ -347,9 +347,9 @@ export function AddRuleModal({
 
         {/* Error */}
         {error && (
-          <div className="mt-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
-            <p className="text-xs text-rose-700">
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-[#FFD3DB] bg-[#FFF5F8] p-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#FF5F7A]" />
+            <p className="text-xs text-[#B4233F]">
               {(error as { shortMessage?: string }).shortMessage ||
                 error.message}
             </p>
@@ -358,9 +358,9 @@ export function AddRuleModal({
 
         {/* Success */}
         {isConfirmed && (
-          <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            <p className="text-xs font-medium text-emerald-700">
+          <div className="mt-4 flex items-center gap-2 rounded-xl border border-[#B2F7DD] bg-[#E8FFF7] p-3">
+            <CheckCircle2 className="h-4 w-4 text-[#028A63]" />
+            <p className="text-xs font-medium text-[#028A63]">
               Rule added successfully! Closing...
             </p>
           </div>
@@ -371,7 +371,7 @@ export function AddRuleModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+            className="rounded-xl border border-[#D9E4FF] px-4 py-2.5 text-sm font-medium text-[#475569] transition-colors hover:bg-[#EEF4FF]"
           >
             Cancel
           </button>
@@ -379,7 +379,7 @@ export function AddRuleModal({
             type="button"
             disabled={!canSubmit}
             onClick={handleSubmit}
-            className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-xl bg-[linear-gradient(90deg,_#37B6FF_0%,_#19D9FF_100%)] px-5 py-2.5 text-sm font-semibold text-[#031B5A] shadow-[0_20px_40px_-24px_rgba(25,217,255,0.75)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isSigning ? (
               <>
