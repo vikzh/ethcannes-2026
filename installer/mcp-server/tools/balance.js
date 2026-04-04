@@ -2,25 +2,42 @@ import { z } from "zod";
 import { formatUnits, formatEther } from "viem";
 import { ERC20_ABI } from "../lib/abi/erc20.js";
 import { getPublicClient } from "../lib/rpc.js";
+import { ACTIVE_CHAIN_ID } from "../lib/constants.js";
 
-export function registerBalanceTools(server, agentAddress) {
+export function registerBalanceTools(server, { effectiveAddress, agentAddress, aaEnabled }) {
+  const chainLabel = ACTIVE_CHAIN_ID === 84532
+    ? "Base Sepolia"
+    : ACTIVE_CHAIN_ID === 11155111
+      ? "Sepolia"
+      : "Base";
+
   server.tool(
     "get_balance",
-    "Get the native ETH balance and/or ERC-20 token balance for an address on Base. Defaults to the agent wallet address.",
+    aaEnabled
+      ? "Get your account's native ETH and/or ERC-20 token balance. Also shows the gas wallet balance. Defaults to your account address."
+      : "Get the native ETH balance and/or ERC-20 token balance for an address. Defaults to the agent wallet address.",
     {
       address: z
         .string()
         .optional()
-        .describe("Address to check. Defaults to agent wallet address"),
+        .describe(
+          aaEnabled
+            ? "Address to check. Defaults to your account address"
+            : "Address to check. Defaults to agent wallet address"
+        ),
       tokenAddress: z
         .string()
         .optional()
         .describe("ERC-20 token contract address. Omit to get native ETH balance only"),
     },
     async ({ address, tokenAddress }) => {
-      const target = address || agentAddress;
+      const target = address || effectiveAddress;
       const client = getPublicClient();
       const lines = [];
+
+      if (aaEnabled && !address) {
+        lines.push(`Account: ${effectiveAddress}`);
+      }
 
       const ethBalance = await client.getBalance({ address: target });
       lines.push(`Native ETH: ${formatEther(ethBalance)} ETH`);
@@ -56,14 +73,22 @@ export function registerBalanceTools(server, agentAddress) {
       }
 
       lines.push(`\nAddress: ${target}`);
-      lines.push(`Chain: Base (8453)`);
+      lines.push(`Chain: ${chainLabel} (${ACTIVE_CHAIN_ID})`);
+
+      if (aaEnabled && !address) {
+        const agentEth = await client.getBalance({ address: agentAddress });
+        lines.push(``);
+        lines.push(`Gas wallet: ${agentAddress}`);
+        lines.push(`Gas wallet ETH: ${formatEther(agentEth)} ETH`);
+      }
+
       return { content: [{ type: "text", text: lines.join("\n") }] };
     }
   );
 
   server.tool(
     "get_token_info",
-    "Get metadata for an ERC-20 token on Base: name, symbol, decimals, total supply.",
+    `Get metadata for an ERC-20 token on ${chainLabel}: name, symbol, decimals, total supply.`,
     {
       tokenAddress: z.string().describe("ERC-20 token contract address"),
     },
@@ -97,7 +122,7 @@ export function registerBalanceTools(server, agentAddress) {
           `Address: ${tokenAddress}`,
           `Decimals: ${decimals}`,
           `Total Supply: ${formatUnits(totalSupply, decimals)}`,
-          `Chain: Base (8453)`,
+          `Chain: ${chainLabel} (${ACTIVE_CHAIN_ID})`,
         ].join("\n");
         return { content: [{ type: "text", text }] };
       } catch (err) {

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { encodeFunctionData, parseUnits, formatUnits } from "viem";
 import { SWAP_ROUTER_ABI, QUOTER_V2_ABI } from "../lib/abi/uniswap-v3.js";
-import { PROTOCOLS, TOKENS, getDecimals, TOKEN_DECIMALS } from "../lib/constants.js";
+import { PROTOCOLS, TOKENS, getDecimals, TOKEN_DECIMALS, ACTIVE_CHAIN_ID } from "../lib/constants.js";
 import { getPublicClient } from "../lib/rpc.js";
 import { ERC20_ABI } from "../lib/abi/erc20.js";
 
@@ -29,7 +29,7 @@ async function resolveDecimals(tokenAddress) {
   }
 }
 
-export function registerUniswapTools(server, agentAddress) {
+export function registerUniswapTools(server, defaultAddress) {
   server.tool(
     "uniswap_swap",
     "Encode a Uniswap V3 exactInputSingle swap transaction on Base. Returns encoded calldata ready for send_transaction. Must approve tokenIn to the router first using approve_erc20 (unless swapping native ETH).",
@@ -57,7 +57,7 @@ export function registerUniswapTools(server, agentAddress) {
         .describe("Recipient address. Defaults to agent wallet address"),
     },
     async ({ tokenIn, tokenOut, amountIn, fee, slippageBps, recipient }) => {
-      const to = recipient || agentAddress;
+      const to = recipient || defaultAddress;
       const [decimalsIn, decimalsOut] = await Promise.all([
         resolveDecimals(tokenIn),
         resolveDecimals(tokenOut),
@@ -115,11 +115,11 @@ export function registerUniswapTools(server, agentAddress) {
         to: PROTOCOLS.UNISWAP_V3_ROUTER,
         data: calldata,
         value: isNativeIn ? amountInWei.toString() : "0",
-        chainId: 8453,
+        chainId: ACTIVE_CHAIN_ID,
       };
 
       const preview = [
-        `Uniswap V3 Swap on Base`,
+        `Uniswap V3 Swap`,
         `  ${amountIn} ${labelIn} -> ${labelOut}`,
         quotedOutFormatted
           ? `  Expected output: ~${quotedOutFormatted} ${labelOut}`

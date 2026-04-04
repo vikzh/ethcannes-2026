@@ -1,14 +1,13 @@
 import { createPublicClient, http } from "viem";
-import { base } from "viem/chains";
-import { BASE_RPC_URL } from "./constants.js";
+import { ACTIVE_CHAIN, RPC_URL } from "./constants.js";
 
 let _client;
 
 export function getPublicClient() {
   if (!_client) {
     _client = createPublicClient({
-      chain: base,
-      transport: http(BASE_RPC_URL),
+      chain: ACTIVE_CHAIN,
+      transport: http(RPC_URL),
     });
   }
   return _client;
