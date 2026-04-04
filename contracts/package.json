@@ -20,7 +20,8 @@
     "test:agent:erc20:1:fail-transfer": "hardhat run scripts/test-agent-erc20-transfer-fail-sepolia.ts --network sepolia",
     "test:agent:erc20:2:request-whitelist": "hardhat run scripts/test-agent-request-whitelist-erc20-sepolia.ts --network sepolia",
     "test:agent:erc20:3:approve-whitelist": "hardhat run scripts/test-owner-approve-whitelist-erc20-sepolia.ts --network sepolia",
-    "test:agent:erc20:4:pass-transfer": "hardhat run scripts/test-agent-erc20-transfer-pass-sepolia.ts --network sepolia"
+    "test:agent:erc20:4:pass-transfer": "hardhat run scripts/test-agent-erc20-transfer-pass-sepolia.ts --network sepolia",
+    "e2e:erc20:whitelist:sepolia": "hardhat run scripts/e2e-erc20-whitelist-flow-sepolia.ts --network sepolia"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

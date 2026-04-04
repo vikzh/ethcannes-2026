@@ -51,6 +51,48 @@ dataSources:
           handler: handleWhitelistRequestCancelled
       file: ./src/whitelist-request-module.ts
 
+  - kind: ethereum
+    name: PolicyHookRuleSpend
+    network: sepolia
+    source:
+      abi: PolicyHookRuleSpend
+      address: "__POLICY_HOOK_ADDRESS__"
+      startBlock: __POLICY_HOOK_START_BLOCK__
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - WhitelistEntry
+        - GlobalSpendLimit
+        - PolicyRule
+        - PolicyConfig
+      abis:
+        - name: PolicyHookRuleSpend
+          file: ../contracts/artifacts/src/hooks/PolicyHookRuleSpend.sol/PolicyHookRuleSpend.json
+      eventHandlers:
+        - event: WhitelistEntryAdded(indexed address,indexed address,indexed bytes4)
+          handler: handleWhitelistEntryAdded
+        - event: WhitelistEntryRemoved(indexed address,indexed address,indexed bytes4)
+          handler: handleWhitelistEntryRemoved
+        - event: SpendLimitSet(indexed address,indexed address,uint256,uint256)
+          handler: handleSpendLimitSet
+        - event: SpendLimitRemoved(indexed address,indexed address)
+          handler: handleSpendLimitRemoved
+        - event: NativeValueCapSet(indexed address,uint256)
+          handler: handleNativeValueCapSet
+        - event: AccountPaused(indexed address)
+          handler: handleAccountPaused
+        - event: AccountUnpaused(indexed address)
+          handler: handleAccountUnpaused
+        - event: EqRuleAdded(indexed address,indexed bytes32,indexed address,bytes4)
+          handler: handleEqRuleAdded
+        - event: EqRuleRemoved(indexed address,indexed bytes32)
+          handler: handleEqRuleRemoved
+        - event: RuleSpendLimitSet(indexed address,indexed bytes32,uint8,uint256,uint256)
+          handler: handleRuleSpendLimitSet
+      file: ./src/policy-hook.ts
+
 templates:
   - kind: ethereum
     name: IsolatedAccount
@@ -80,3 +122,24 @@ templates:
         - event: Executed(indexed address,uint256,bytes4,indexed uint256,indexed bytes32,uint256)
           handler: handleExecuted
       file: ./src/isolated-account.ts
+
+  - kind: ethereum
+    name: AgentSessionValidator
+    network: sepolia
+    source:
+      abi: AgentSessionValidator
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - AgentSession
+      abis:
+        - name: AgentSessionValidator
+          file: ../contracts/artifacts/src/validators/AgentSessionValidator.sol/AgentSessionValidator.json
+      eventHandlers:
+        - event: SessionCreated(indexed address,indexed uint256,indexed address,uint48,uint48)
+          handler: handleSessionCreated
+        - event: SessionRevoked(indexed address,indexed uint256)
+          handler: handleSessionRevoked
+      file: ./src/agent-session-validator.ts

@@ -1,44 +1,36 @@
 {
   "network": "sepolia",
   "chainId": 11155111,
-  "deployer": "0x0A1d00262B98027581C08641E1233D9B0Bc5D10C",
-  "deployedAt": "2026-04-03T23:00:36.795Z",
+  "deployer": "0xFe56D5E15F74E3587ab5e60dc6Fd45DD71EdeF45",
+  "deployedAt": "2026-04-04T10:45:12.931Z",
   "contracts": {
     "PolicyHook": {
-      "address": "0x02E2809c163a8288bc048f845Fd374f902Ab4d2C",
-      "deploymentBlock": 10584565
+      "address": "0x6e11448E0d1095650B0037C602C2Da53311EBFe3",
+      "deploymentBlock": 10587991
+    },
+    "PolicyHookRuleSpend": {
+      "address": "0x6e11448E0d1095650B0037C602C2Da53311EBFe3",
+      "deploymentBlock": 10587991
     },
     "AgentSessionValidator": {
-      "address": "0xEE9e141ec9f3a3D9Fb2C732882CA2eEDD0eC530B",
-      "deploymentBlock": 10584566
+      "address": "0xF8E806eE3B00Eb9ED4285Ce5015A76c1B75B5258",
+      "deploymentBlock": 10587992
     },
     "WhitelistRequestModule": {
-      "address": "0x91Bd09CE180552eb28E04B026fE10158A565aCe0",
-      "deploymentBlock": 10584567
+      "address": "0x76c4f12fd2f34F8b54a2a2639fC00Ae3fDc11dDd",
+      "deploymentBlock": 10587993
     },
     "EmergencyControls": {
-      "address": "0x31b302693BFd409d6259fe03AcF08491d6fE69f8",
-      "deploymentBlock": 10584568
+      "address": "0x3040Fa5e8d81D06397D2510e5619CE1a085B2135",
+      "deploymentBlock": 10587994
     },
     "AbstractAccountFactory": {
-      "address": "0xD2d478f45642B1cb87Ed70C7feF7BE714f833932",
-      "deploymentBlock": 10584569
+      "address": "0xa89b4648Da8b8c2B107D7057a6a944470675C83E",
+      "deploymentBlock": 10587995
     },
     "MockERC20": {
-      "address": "0x55b58DA1d2022EEa77e67c449F7fc99F17446229",
-      "deploymentBlock": 10584729
-    },
-    "MockERC20_1": {
-      "address": "0xF29934Cc706E20ddA4Ba265FdE0d69c2e35E3988",
-      "deploymentBlock": 10584792
-    },
-    "MockERC20_2": {
-      "address": "0x8F2b6cCacC9673BfB9A3df721E0436D00ed4620D",
-      "deploymentBlock": 10584796
-    },
-    "MockERC20_3": {
-      "address": "0xD62E6474E2b1c84AFFE9a01819329bE93ebEaFEA",
-      "deploymentBlock": 10584798
+      "address": "0x31f8C5034A18519f0ADd9adFb15968d468B3aAcF",
+      "deploymentBlock": 10588077
     }
   }
 }

@@ -36,7 +36,7 @@ async function main() {
     };
   };
 
-  const policyHook = await deployContract("PolicyHook");
+  const policyHookRuleSpend = await deployContract("PolicyHookRuleSpend");
   const agentSessionValidator = await deployContract("AgentSessionValidator");
   const whitelistRequestModule = await deployContract("WhitelistRequestModule");
   const emergencyControls = await deployContract("EmergencyControls");
@@ -48,7 +48,9 @@ async function main() {
     deployer: deployerAddress,
     deployedAt: new Date().toISOString(),
     contracts: {
-      PolicyHook: policyHook,
+      // Backward compatibility: keep PolicyHook key used by older scripts.
+      PolicyHook: policyHookRuleSpend,
+      PolicyHookRuleSpend: policyHookRuleSpend,
       AgentSessionValidator: agentSessionValidator,
       WhitelistRequestModule: whitelistRequestModule,
       EmergencyControls: emergencyControls,

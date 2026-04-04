@@ -33,7 +33,14 @@ async function loadDeploymentRecord(): Promise<DeploymentRecord> {
   return JSON.parse(raw) as DeploymentRecord;
 }
 
-async function main() {
+export type CreateWalletResult = {
+  accountAddress: string;
+  owner: string;
+  txHash: string;
+  blockNumber: number;
+};
+
+export async function createWalletSepolia(): Promise<CreateWalletResult> {
   if (network.name !== "sepolia") {
     throw new Error(`This script is intended for sepolia, got: ${network.name}`);
   }
@@ -136,9 +143,22 @@ async function main() {
   console.log(`- owner: ${onchainOwner}`);
   console.log(`- txHash: ${receipt.hash}`);
   console.log(`- block: ${receipt.blockNumber}`);
+
+  return {
+    accountAddress: predicted,
+    owner: onchainOwner,
+    txHash: receipt.hash,
+    blockNumber: receipt.blockNumber,
+  };
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+async function main() {
+  await createWalletSepolia();
+}
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

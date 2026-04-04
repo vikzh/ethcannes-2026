@@ -11,6 +11,88 @@ type Account @entity(immutable: false) {
   updatedAtTimestamp: BigInt!
 }
 
+# Active (target, selector) whitelist entries per account.
+# active=false means the entry was removed.
+type WhitelistEntry @entity(immutable: false) {
+  id: ID!                   # {account}-{target}-{selector}
+  account: Bytes!
+  target: Bytes!
+  selector: Bytes!
+  active: Boolean!
+  addedAtBlock: BigInt!
+  addedAtTimestamp: BigInt!
+  addedTxHash: Bytes!
+  updatedAtBlock: BigInt!
+  updatedAtTimestamp: BigInt!
+  updatedTxHash: Bytes!
+}
+
+# Global per-token ERC-20 spend limits.
+# active=false means the limit was removed.
+type GlobalSpendLimit @entity(immutable: false) {
+  id: ID!                   # {account}-{token}
+  account: Bytes!
+  token: Bytes!
+  maxPerPeriod: BigInt!
+  periodDuration: BigInt!
+  active: Boolean!
+  setAtBlock: BigInt!
+  setAtTimestamp: BigInt!
+  setTxHash: Bytes!
+  updatedAtBlock: BigInt!
+  updatedAtTimestamp: BigInt!
+  updatedTxHash: Bytes!
+}
+
+# Equality/spend rules (from PolicyHookRuleSpend).
+# active=false means the rule was removed.
+type PolicyRule @entity(immutable: false) {
+  id: ID!                   # {account}-{ruleId}
+  account: Bytes!
+  ruleId: Bytes!
+  target: Bytes!
+  selector: Bytes!
+  active: Boolean!
+  # Per-rule spend tracking. spendParamIndex=255 means no tracking.
+  spendParamIndex: Int!
+  maxPerPeriod: BigInt!
+  periodDuration: BigInt!
+  addedAtBlock: BigInt!
+  addedAtTimestamp: BigInt!
+  addedTxHash: Bytes!
+  updatedAtBlock: BigInt!
+  updatedAtTimestamp: BigInt!
+  updatedTxHash: Bytes!
+}
+
+# Agent session state — one active session per account at a time.
+type AgentSession @entity(immutable: false) {
+  id: ID!                   # {account}
+  account: Bytes!
+  agentKey: Bytes!
+  validAfter: BigInt!
+  validUntil: BigInt!
+  nonce: BigInt!
+  revoked: Boolean!
+  createdAtBlock: BigInt!
+  createdAtTimestamp: BigInt!
+  createdTxHash: Bytes!
+  updatedAtBlock: BigInt!
+  updatedAtTimestamp: BigInt!
+  updatedTxHash: Bytes!
+}
+
+# Per-account policy config (native value cap + pause state).
+type PolicyConfig @entity(immutable: false) {
+  id: ID!                   # {account}
+  account: Bytes!
+  nativeValueCap: BigInt!   # 0 = no cap
+  paused: Boolean!
+  updatedAtBlock: BigInt!
+  updatedAtTimestamp: BigInt!
+  updatedTxHash: Bytes!
+}
+
 type ExecutionEnvelope @entity(immutable: true) {
   id: ID!
   account: Bytes!

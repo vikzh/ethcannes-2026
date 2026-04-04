@@ -5,6 +5,9 @@ import {
   OwnershipTransferred as OwnershipTransferredEvent,
   PolicyHookSet as PolicyHookSetEvent,
 } from "../generated/templates/IsolatedAccount/IsolatedAccount";
+import {
+  AgentSessionValidator as AgentSessionValidatorTemplate,
+} from "../generated/templates";
 import { Account, ExecutionCall, ExecutionEnvelope } from "../generated/schema";
 import { Address, BigInt, Bytes } from "@graphprotocol/graph-ts";
 
@@ -39,6 +42,7 @@ export function handlePolicyHookSet(event: PolicyHookSetEvent): void {
   account.updatedAtBlock = event.block.number;
   account.updatedAtTimestamp = event.block.timestamp;
   account.save();
+
 }
 
 export function handleAgentSessionValidatorSet(event: AgentSessionValidatorSetEvent): void {
@@ -48,6 +52,9 @@ export function handleAgentSessionValidatorSet(event: AgentSessionValidatorSetEv
   account.updatedAtBlock = event.block.number;
   account.updatedAtTimestamp = event.block.timestamp;
   account.save();
+
+  // Start indexing events from the agent session validator contract.
+  AgentSessionValidatorTemplate.create(event.params.validator);
 }
 
 export function handleExecutionEnvelope(event: ExecutionEnvelopeEvent): void {

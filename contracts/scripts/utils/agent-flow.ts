@@ -1,6 +1,7 @@
 import { ethers, network } from "hardhat";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { logSubgraphStep } from "./subgraph";
 
 export const MODE_SINGLE = "0x00" + "00".repeat(31);
 export const NATIVE_TRANSFER_SELECTOR = "0x00000000";
@@ -105,7 +106,7 @@ export async function getContext() {
   }
 
   const account = await ethers.getContractAt("IsolatedAccount", accountAddress, owner);
-  const policyHook = await ethers.getContractAt("PolicyHook", policyHookAddress, owner);
+  const policyHook = await ethers.getContractAt("PolicyHookRuleSpend", policyHookAddress, owner);
   const whitelistModule = await ethers.getContractAt(
     "WhitelistRequestModule",
     whitelistModuleAddress,
@@ -129,36 +130,5 @@ export async function getContext() {
 }
 
 export async function maybeQuerySubgraph(accountAddress: string): Promise<void> {
-  const apiKey = process.env.GRAPH_API_KEY;
-  if (!apiKey) {
-    console.log("GRAPH_API_KEY not set, skipping subgraph query.");
-    return;
-  }
-  const subgraphId = process.env.GRAPH_SUBGRAPH_ID || "ApzeUQepZLrJdxtipSY6nVJYPb62kjKNFv8orpBRLk1E";
-  const url = `https://gateway.thegraph.com/api/subgraphs/id/${subgraphId}`;
-  const body = {
-    query: `{
-      whitelistRequests(first: 5, where: { account: "${accountAddress.toLowerCase()}", status: "Pending" }) {
-        id
-        account
-        requestId
-        target
-        selector
-        metadata
-      }
-    }`,
-    operationName: "PendingRequests",
-    variables: {},
-  };
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
-  const json = await res.json();
-  console.log("Subgraph response:", JSON.stringify(json));
+  await logSubgraphStep("maybeQuerySubgraph", accountAddress);
 }
