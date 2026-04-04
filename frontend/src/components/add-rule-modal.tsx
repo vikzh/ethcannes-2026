@@ -62,6 +62,26 @@ function normalizeAddress(value: string): Address | undefined {
   return getAddress(value);
 }
 
+/** Empty → ERC-20 transfer selector; invalid hex → undefined */
+function resolveCustomSelector(raw: string): `0x${string}` | undefined {
+  const t = raw.trim();
+  if (t === "") return TRANSFER_SELECTOR;
+  return /^0x[0-9a-fA-F]{8}$/.test(t) ? (t as `0x${string}`) : undefined;
+}
+
+function isValidOptionalMaxAmount18(raw: string): boolean {
+  const t = raw.trim();
+  if (t === "") return true;
+  try {
+    parseUnits(t, 18);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const SPEND_DISABLED_PARAM_INDEX = 255;
+
 export function AddRuleModal({
   accountAddress,
   policyHookAddress,
@@ -163,13 +183,15 @@ export function AddRuleModal({
 
   const normalizedCustomSource = normalizeAddress(customSource);
   const normalizedCustomDestination = normalizeAddress(customDestination);
-  const isValidSelector = /^0x[0-9a-fA-F]{8}$/.test(customSelector);
+  const resolvedCustomSelector = resolveCustomSelector(customSelector);
 
   const canSubmit =
     (ruleType === "ens"
       ? ensRule.trim().length > 0 && maxAmount.length > 0
       : ruleType === "custom"
-        ? !!normalizedCustomSource && !!normalizedCustomDestination && isValidSelector && maxAmount.length > 0
+        ? !!normalizedCustomSource &&
+            resolvedCustomSelector !== undefined &&
+            isValidOptionalMaxAmount18(maxAmount)
         : isValidToken &&
           (ruleType === "whitelist" || (isValidDestination && maxAmount.length > 0))) &&
     !isSigning &&
@@ -182,27 +204,41 @@ export function AddRuleModal({
     let hookCalldata: `0x${string}`;
 
     if (ruleType === "custom") {
-      if (!normalizedCustomSource || !normalizedCustomDestination) return;
-      const parsedAmount = parseUnits(maxAmount, 18);
-      const period = PERIOD_OPTIONS[periodIndex].seconds;
+      if (!normalizedCustomSource) return;
+      const selectorResolved = resolveCustomSelector(customSelector);
+      if (!selectorResolved) return;
+
+      const conditions = normalizedCustomDestination
+        ? [
+            {
+              paramIndex: 0,
+              expectedValue: addressToBytes32(normalizedCustomDestination),
+            },
+          ]
+        : [];
+
+      const maxTrim = maxAmount.trim();
+      const spend =
+        maxTrim.length > 0
+          ? {
+              spendParamIndex: 1,
+              maxPerPeriod: parseUnits(maxTrim, 18),
+              periodDuration: BigInt(PERIOD_OPTIONS[periodIndex].seconds),
+            }
+          : {
+              spendParamIndex: SPEND_DISABLED_PARAM_INDEX,
+              maxPerPeriod: BigInt(0),
+              periodDuration: BigInt(0),
+            };
 
       hookCalldata = encodeFunctionData({
         abi: POLICY_HOOK_ABI,
         functionName: "addEqRuleWithSpend",
         args: [
           normalizedCustomSource,
-          customSelector as `0x${string}`,
-          [
-            {
-              paramIndex: 0,
-              expectedValue: addressToBytes32(normalizedCustomDestination),
-            },
-          ],
-          {
-            spendParamIndex: 1,
-            maxPerPeriod: parsedAmount,
-            periodDuration: BigInt(period),
-          },
+          selectorResolved,
+          conditions,
+          spend,
         ],
       });
     } else if (ruleType === "ens") {
@@ -392,7 +428,7 @@ export function AddRuleModal({
               </div>
               <div>
                 <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
-                  Destination address
+                  Destination address (optional)
                 </label>
                 <input
                   type="text"
@@ -404,7 +440,7 @@ export function AddRuleModal({
               </div>
               <div>
                 <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
-                  Function selector
+                  Function selector (optional)
                 </label>
                 <input
                   type="text"
@@ -414,7 +450,7 @@ export function AddRuleModal({
                   className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm font-mono text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
                 />
                 <p className="mt-1.5 text-xs text-zinc-500">
-                  4-byte function selector (e.g. 0xa9059cbb for ERC-20 transfer)
+                  4-byte selector; leave blank to use ERC-20 transfer (0xa9059cbb)
                 </p>
               </div>
             </>
@@ -489,7 +525,9 @@ export function AddRuleModal({
               {/* Max amount */}
               <div>
                 <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
-                  Max amount per period{tokenSymbol ? ` (${tokenSymbol})` : ""}
+                  Max amount per period
+                  {ruleType === "custom" ? " (optional)" : ""}
+                  {tokenSymbol ? ` (${tokenSymbol})` : ""}
                 </label>
                 <input
                   type="text"
@@ -508,12 +546,21 @@ export function AddRuleModal({
               <div>
                 <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
                   Period duration
+                  {ruleType === "custom" && maxAmount.trim().length === 0
+                    ? " (optional)"
+                    : ""}
                 </label>
+                {ruleType === "custom" && maxAmount.trim().length === 0 ? (
+                  <p className="mt-1.5 text-xs text-zinc-500">
+                    Only used when a max amount is set.
+                  </p>
+                ) : null}
                 <div className="relative mt-1.5">
                   <select
                     value={periodIndex}
                     onChange={(e) => setPeriodIndex(Number(e.target.value))}
-                    className="w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 pr-10 text-sm text-zinc-900 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                    disabled={ruleType === "custom" && maxAmount.trim().length === 0}
+                    className="w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 pr-10 text-sm text-zinc-900 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {PERIOD_OPTIONS.map((opt, i) => (
                       <option key={opt.seconds} value={i}>
