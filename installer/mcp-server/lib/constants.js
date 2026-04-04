@@ -1,10 +1,45 @@
-import { base } from "viem/chains";
+import { base, baseSepolia, sepolia } from "viem/chains";
 
-export const DEFAULT_CHAIN = base;
-export const DEFAULT_CHAIN_ID = base.id; // 8453
+// AA Smart Account config (set via env vars)
+export const AA_ACCOUNT = process.env.AA_ACCOUNT_ADDRESS || "";
+export const AA_CHAIN_ID = parseInt(process.env.AA_CHAIN_ID || "11155111", 10);
 
-export const BASE_RPC_URL =
-  process.env.BASE_RPC_URL || "https://mainnet.base.org";
+const CHAIN_MAP = {
+  [base.id]: base,
+  [baseSepolia.id]: baseSepolia,
+  [sepolia.id]: sepolia,
+};
+
+const DEFAULT_RPC = {
+  [base.id]: "https://mainnet.base.org",
+  [baseSepolia.id]: "https://sepolia.base.org",
+  [sepolia.id]: "https://ethereum-sepolia-rpc.publicnode.com",
+};
+
+const EXPLORER_MAP = {
+  [base.id]: "https://basescan.org",
+  [baseSepolia.id]: "https://sepolia.basescan.org",
+  [sepolia.id]: "https://sepolia.etherscan.io",
+};
+
+export const ACTIVE_CHAIN = CHAIN_MAP[AA_CHAIN_ID] || (AA_ACCOUNT ? sepolia : base);
+export const ACTIVE_CHAIN_ID = ACTIVE_CHAIN.id;
+
+export const RPC_URL =
+  process.env.RPC_URL ||
+  process.env.BASE_RPC_URL ||
+  DEFAULT_RPC[ACTIVE_CHAIN_ID] ||
+  "https://mainnet.base.org";
+
+const EXPLORER_BASE = EXPLORER_MAP[ACTIVE_CHAIN_ID] || "https://basescan.org";
+
+export function explorerTxUrl(hash) {
+  return `${EXPLORER_BASE}/tx/${hash}`;
+}
+
+export function explorerAddressUrl(addr) {
+  return `${EXPLORER_BASE}/address/${addr}`;
+}
 
 export const TOKENS = {
   WETH: "0x4200000000000000000000000000000000000006",
@@ -23,7 +58,6 @@ export const PROTOCOLS = {
   AAVE_V3_POOL_DATA_PROVIDER: "0x2d8A3C5677189723C4cB8873CfC9C8976FDF38Ac",
 };
 
-// Build decimals map with lowercase keys for case-insensitive lookup
 const _decimalsRaw = {
   [TOKENS.WETH]: 18,
   [TOKENS.USDC]: 6,

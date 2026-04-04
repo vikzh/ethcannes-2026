@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { encodeFunctionData, parseUnits, formatUnits } from "viem";
 import { AAVE_V3_POOL_ABI } from "../lib/abi/aave-v3.js";
-import { PROTOCOLS, getDecimals } from "../lib/constants.js";
+import { PROTOCOLS, getDecimals, ACTIVE_CHAIN_ID } from "../lib/constants.js";
 import { getPublicClient } from "../lib/rpc.js";
 
 const POOL = PROTOCOLS.AAVE_V3_POOL;
 
-export function registerAaveTools(server, agentAddress) {
+export function registerAaveTools(server, defaultAddress) {
   server.tool(
     "aave_supply",
     "Encode an Aave V3 supply (deposit) transaction on Base. You must approve_erc20 the asset to the Aave Pool first. Returns encoded tx for send_transaction.",
@@ -18,10 +18,10 @@ export function registerAaveTools(server, agentAddress) {
       onBehalfOf: z
         .string()
         .optional()
-        .describe("Address to receive aTokens. Defaults to agent wallet"),
+        .describe("Address to receive aTokens. Defaults to your account"),
     },
     async ({ asset, amount, onBehalfOf }) => {
-      const behalf = onBehalfOf || agentAddress;
+      const behalf = onBehalfOf || defaultAddress;
       const decimals = getDecimals(asset);
       const amountWei = parseUnits(amount, decimals);
 
@@ -35,11 +35,11 @@ export function registerAaveTools(server, agentAddress) {
         to: POOL,
         data: calldata,
         value: "0",
-        chainId: 8453,
+        chainId: ACTIVE_CHAIN_ID,
       };
 
       const text = [
-        `Aave V3 Supply on Base`,
+        `Aave V3 Supply`,
         `  Asset: ${asset}`,
         `  Amount: ${amount}`,
         `  On behalf of: ${behalf}`,
@@ -69,10 +69,10 @@ export function registerAaveTools(server, agentAddress) {
       to: z
         .string()
         .optional()
-        .describe("Recipient address. Defaults to agent wallet"),
+        .describe("Recipient address. Defaults to your account"),
     },
     async ({ asset, amount, to }) => {
-      const recipient = to || agentAddress;
+      const recipient = to || defaultAddress;
       const decimals = getDecimals(asset);
       const amountWei =
         amount.toLowerCase() === "max"
@@ -89,11 +89,11 @@ export function registerAaveTools(server, agentAddress) {
         to: POOL,
         data: calldata,
         value: "0",
-        chainId: 8453,
+        chainId: ACTIVE_CHAIN_ID,
       };
 
       const text = [
-        `Aave V3 Withdraw on Base`,
+        `Aave V3 Withdraw`,
         `  Asset: ${asset}`,
         `  Amount: ${amount}`,
         `  To: ${recipient}`,
@@ -126,10 +126,10 @@ export function registerAaveTools(server, agentAddress) {
       onBehalfOf: z
         .string()
         .optional()
-        .describe("Address to receive debt. Defaults to agent wallet"),
+        .describe("Address to receive debt. Defaults to your account"),
     },
     async ({ asset, amount, interestRateMode, onBehalfOf }) => {
-      const behalf = onBehalfOf || agentAddress;
+      const behalf = onBehalfOf || defaultAddress;
       const decimals = getDecimals(asset);
       const amountWei = parseUnits(amount, decimals);
 
@@ -143,11 +143,11 @@ export function registerAaveTools(server, agentAddress) {
         to: POOL,
         data: calldata,
         value: "0",
-        chainId: 8453,
+        chainId: ACTIVE_CHAIN_ID,
       };
 
       const text = [
-        `Aave V3 Borrow on Base`,
+        `Aave V3 Borrow`,
         `  Asset: ${asset}`,
         `  Amount: ${amount}`,
         `  Rate mode: ${interestRateMode === 1 ? "stable" : "variable"}`,
@@ -181,10 +181,10 @@ export function registerAaveTools(server, agentAddress) {
       onBehalfOf: z
         .string()
         .optional()
-        .describe("Address whose debt to repay. Defaults to agent wallet"),
+        .describe("Address whose debt to repay. Defaults to your account"),
     },
     async ({ asset, amount, interestRateMode, onBehalfOf }) => {
-      const behalf = onBehalfOf || agentAddress;
+      const behalf = onBehalfOf || defaultAddress;
       const decimals = getDecimals(asset);
       const amountWei =
         amount.toLowerCase() === "max"
@@ -201,11 +201,11 @@ export function registerAaveTools(server, agentAddress) {
         to: POOL,
         data: calldata,
         value: "0",
-        chainId: 8453,
+        chainId: ACTIVE_CHAIN_ID,
       };
 
       const text = [
-        `Aave V3 Repay on Base`,
+        `Aave V3 Repay`,
         `  Asset: ${asset}`,
         `  Amount: ${amount}`,
         `  Rate mode: ${interestRateMode === 1 ? "stable" : "variable"}`,
@@ -232,10 +232,10 @@ export function registerAaveTools(server, agentAddress) {
       address: z
         .string()
         .optional()
-        .describe("Address to query. Defaults to agent wallet"),
+        .describe("Address to query. Defaults to your account"),
     },
     async ({ address }) => {
-      const target = address || agentAddress;
+      const target = address || defaultAddress;
       const client = getPublicClient();
 
       try {
@@ -263,7 +263,7 @@ export function registerAaveTools(server, agentAddress) {
             : formatUnits(healthFactor, 18);
 
         const text = [
-          `Aave V3 Account Data on Base`,
+          `Aave V3 Account Data`,
           `  Address: ${target}`,
           `  Total Collateral (USD): $${fmt(totalCollateralBase)}`,
           `  Total Debt (USD): $${fmt(totalDebtBase)}`,
@@ -301,7 +301,7 @@ export function registerAaveTools(server, agentAddress) {
           functionName: "getReservesList",
         });
         const text = [
-          `Aave V3 Reserves on Base (${reserves.length} markets):`,
+          `Aave V3 Reserves (${reserves.length} markets):`,
           ...reserves.map((r, i) => `  ${i + 1}. ${r}`),
         ].join("\n");
         return { content: [{ type: "text", text }] };

@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { encodeFunctionData, parseUnits, maxUint256 } from "viem";
 import { ERC20_ABI } from "../lib/abi/erc20.js";
-import { getDecimals } from "../lib/constants.js";
+import { getDecimals, ACTIVE_CHAIN_ID } from "../lib/constants.js";
 
-export function registerTokenTools(server, agentAddress) {
+export function registerTokenTools(server, _defaultAddress) {
   server.tool(
     "approve_erc20",
     "Encode an ERC-20 approve transaction on Base. Required before interacting with protocols (Uniswap, Aave) that need to spend your tokens. Returns encoded tx for send_transaction.",
@@ -39,11 +39,11 @@ export function registerTokenTools(server, agentAddress) {
         to: tokenAddress,
         data: calldata,
         value: "0",
-        chainId: 8453,
+        chainId: ACTIVE_CHAIN_ID,
       };
 
       const text = [
-        `ERC-20 Approve on Base`,
+        `ERC-20 Approve`,
         `  Token: ${tokenAddress}`,
         `  Spender: ${spender}`,
         `  Amount: ${amountDisplay}`,
@@ -84,11 +84,11 @@ export function registerTokenTools(server, agentAddress) {
         to: tokenAddress,
         data: calldata,
         value: "0",
-        chainId: 8453,
+        chainId: ACTIVE_CHAIN_ID,
       };
 
       const text = [
-        `ERC-20 Transfer on Base`,
+        `ERC-20 Transfer`,
         `  Token: ${tokenAddress}`,
         `  To: ${to}`,
         `  Amount: ${amount}`,

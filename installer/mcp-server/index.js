@@ -13,7 +13,8 @@ import { registerBalanceTools } from "./tools/balance.js";
 import { registerTokenTools } from "./tools/token.js";
 import { registerContractTools } from "./tools/contract.js";
 import { registerTransactionTools } from "./tools/transaction.js";
-import { PROTOCOLS, TOKENS } from "./lib/constants.js";
+import { registerAccountTools } from "./tools/account.js";
+import { PROTOCOLS, TOKENS, AA_ACCOUNT, ACTIVE_CHAIN_ID, explorerAddressUrl } from "./lib/constants.js";
 
 const WALLET_NAME = process.env.AGENT_WALLET_NAME || "agent-wallet";
 const KEY_FILE = join(homedir(), ".ows", `${WALLET_NAME}.key`);
@@ -57,18 +58,60 @@ async function resolveWalletAddress() {
 
 const agentAddress = await resolveWalletAddress();
 
+// When AA is active, the IsolatedAccount holds funds and is the DeFi actor.
+// The agent EOA only signs and pays gas for the outer executeAuthorized tx.
+const effectiveAddress = AA_ACCOUNT || agentAddress;
+
+const chainLabel = ACTIVE_CHAIN_ID === 84532
+  ? "Base Sepolia (testnet)"
+  : ACTIVE_CHAIN_ID === 11155111
+    ? "Sepolia (testnet)"
+    : "Base (mainnet)";
+
+const aaInstructions = AA_ACCOUNT
+  ? [
+    ``,
+    `== AA Smart Account Protection ==`,
+    ``,
+    `Your account is protected by on-chain policies:`,
+    `  ${explorerAddressUrl(AA_ACCOUNT)}`,
+    `  The PolicyHook enforces whitelists and spend limits before any call executes.`,
+    `  Transactions are signed with EIP-712 and routed through the account contract.`,
+    ``,
+    `AA Inspection Tools:`,
+    `- account_info: Read account state (owner, modules, nonce, balance, policy, session)`,
+    `- account_check_whitelist: Check if a (target, selector) is allowed`,
+    `- account_get_spend_limit: Read spend limit for a token`,
+    `- account_get_policy: Read policy config (paused, native value cap)`,
+    ``,
+    `If a transaction reverts with "NotWhitelisted" or "SpendLimitExceeded",`,
+    `use the inspection tools to diagnose the issue. The owner must update`,
+    `the whitelist or spend limits via the account's execute path.`,
+  ]
+  : [];
+
 const server = new McpServer(
   {
     name: "agent-wallet",
-    version: "0.2.0",
+    version: "0.3.0",
   },
   {
     instructions: [
-      `You have an on-chain agent wallet managed by OWS with DeFi capabilities.`,
+      AA_ACCOUNT
+        ? `You have an abstract account (smart contract wallet) on-chain.`
+        : `You have an on-chain agent wallet managed by OWS with DeFi capabilities.`,
       ``,
-      `Wallet name: ${WALLET_NAME}`,
-      `Agent address: ${agentAddress}`,
-      `Chain: Base (eip155:8453)`,
+      AA_ACCOUNT
+        ? [
+          `YOUR ACCOUNT: ${AA_ACCOUNT}`,
+          `  This is your main address. All funds live here. All balances, swaps,`,
+          `  approvals, and DeFi positions belong to this address.`,
+          `Gas wallet (EOA): ${agentAddress}`,
+          `  This wallet only signs transactions and pays gas fees. Do not check`,
+          `  this address for balances — it is NOT where your funds are.`,
+        ].join("\n")
+        : `Wallet: ${agentAddress}`,
+      `Chain: ${chainLabel} (eip155:${ACTIVE_CHAIN_ID})`,
       ``,
       `== DeFi Tools ==`,
       ``,
@@ -95,7 +138,7 @@ const server = new McpServer(
       `- contract_encode: Encode calldata for any function.`,
       ``,
       `Transaction Execution:`,
-      `- send_transaction: Sign and broadcast an encoded tx on Base. Supports optional nonce and gas overrides for replacing stuck txs.`,
+      `- send_transaction: Sign and broadcast an encoded tx. Supports optional nonce and gas overrides for replacing stuck txs.`,
       `- cancel_transaction: Cancel a stuck tx by re-sending at the same nonce with higher gas.`,
       `- get_pending_nonce: Check if any transactions are stuck in the mempool.`,
       `- get_transaction: Look up a transaction by hash.`,
@@ -111,6 +154,7 @@ const server = new McpServer(
       `DAI:   ${TOKENS.DAI}`,
       `cbETH: ${TOKENS.cbETH}`,
       `wstETH: ${TOKENS.wstETH}`,
+      ...aaInstructions,
       ``,
       `== Typical Workflow ==`,
       `1. Check balance: get_balance`,
@@ -125,7 +169,9 @@ const server = new McpServer(
       `3. Retry the original transaction`,
       ``,
       `Security: All signing is performed through this MCP server via OWS.`,
-      `Transactions are restricted by on-chain AA policies (whitelists, spend limits).`,
+      AA_ACCOUNT
+        ? `Transactions are enforced by on-chain AA policies (whitelists, spend limits) via IsolatedAccount.`
+        : `Transactions are restricted by OWS policies.`,
     ].join("\n"),
   }
 );
@@ -176,12 +222,16 @@ server.tool(
 
 // --- DeFi tools ---
 
-registerUniswapTools(server, agentAddress);
-registerAaveTools(server, agentAddress);
-registerBalanceTools(server, agentAddress);
-registerTokenTools(server, agentAddress);
+registerUniswapTools(server, effectiveAddress);
+registerAaveTools(server, effectiveAddress);
+registerBalanceTools(server, { effectiveAddress, agentAddress, aaEnabled: !!AA_ACCOUNT });
+registerTokenTools(server, effectiveAddress);
 registerContractTools(server);
 registerTransactionTools(server, { owsExec, readApiKey, walletName: WALLET_NAME, agentAddress });
+
+// --- AA inspection tools ---
+
+registerAccountTools(server);
 
 // --- Legacy prompt (kept for backwards compat) ---
 

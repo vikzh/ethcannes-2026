@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { serializeTransaction, parseGwei } from "viem";
 import { getPublicClient } from "../lib/rpc.js";
+import { AA_ACCOUNT, ACTIVE_CHAIN_ID, RPC_URL, explorerTxUrl } from "../lib/constants.js";
+import { buildAATransaction } from "../lib/aa.js";
 
 async function buildAndBroadcast({
   publicClient,
@@ -12,6 +14,8 @@ async function buildAndBroadcast({
   data,
   value,
   chainId,
+  chainName,
+  rpcUrl,
   nonce: explicitNonce,
   maxFeePerGas: explicitMaxFee,
   maxPriorityFeePerGas: explicitPriorityFee,
@@ -35,7 +39,7 @@ async function buildAndBroadcast({
       nonce,
     });
   } catch {
-    gasEstimate = 200_000n;
+    gasEstimate = 500_000n;
   }
   const gas = (gasEstimate * BigInt(gasMultiplierPct)) / 100n;
 
@@ -60,10 +64,12 @@ async function buildAndBroadcast({
     ? serializedUnsigned.slice(2)
     : serializedUnsigned;
 
-  const result = await owsExec(
-    ["sign", "send-tx", "--chain", "base", "--wallet", walletName, "--tx", txHex, "--json"],
-    apiKey,
-  );
+  const sendArgs = ["sign", "send-tx", "--chain", chainName, "--wallet", walletName, "--tx", txHex, "--json"];
+  if (rpcUrl) {
+    sendArgs.push("--rpc-url", rpcUrl);
+  }
+
+  const result = await owsExec(sendArgs, apiKey);
 
   let txHash;
   try {
@@ -77,10 +83,18 @@ async function buildAndBroadcast({
   return { txHash, nonce, gas, maxFeePerGas, maxPriorityFeePerGas, rawOutput: result };
 }
 
+function chainName(chainId) {
+  const names = { 8453: "base", 1: "ethereum", 42161: "arbitrum", 10: "optimism", 137: "polygon" };
+  return names[chainId] || `eip155:${chainId}`;
+}
+
 export function registerTransactionTools(server, { owsExec, readApiKey, walletName, agentAddress }) {
+  const activeChainId = ACTIVE_CHAIN_ID;
+  const aaAccount = AA_ACCOUNT;
+
   server.tool(
     "send_transaction",
-    "Sign and broadcast a transaction on Base via the agent wallet (OWS). Takes an encoded tx object (from uniswap_swap, aave_supply, approve_erc20, contract_encode, etc.) and submits it on-chain. Supports optional nonce override and gas price override for replacing stuck transactions.",
+    "Sign and broadcast a transaction via the agent wallet (OWS). When AA protection is enabled, the inner call is wrapped in IsolatedAccount.executeAuthorized with EIP-712 signing. Takes an encoded tx object (from uniswap_swap, aave_supply, approve_erc20, contract_encode, etc.) and submits it on-chain.",
     {
       to: z.string().describe("Target contract/address"),
       data: z.string().describe("Encoded calldata hex string"),
@@ -88,14 +102,10 @@ export function registerTransactionTools(server, { owsExec, readApiKey, walletNa
         .string()
         .default("0")
         .describe("ETH value to send in wei. Default: 0"),
-      chainId: z
-        .number()
-        .default(8453)
-        .describe("Chain ID. Default: 8453 (Base)"),
       nonce: z
         .number()
         .optional()
-        .describe("Override nonce. Use to replace a stuck/pending transaction at the same nonce"),
+        .describe("Override nonce (EOA nonce for direct mode, ignored in AA mode). Use to replace a stuck/pending transaction"),
       maxFeePerGasGwei: z
         .string()
         .optional()
@@ -105,14 +115,7 @@ export function registerTransactionTools(server, { owsExec, readApiKey, walletNa
         .optional()
         .describe("Override max priority fee per gas in gwei (e.g. '0.1')"),
     },
-    async ({ to, data, value, chainId, nonce, maxFeePerGasGwei, maxPriorityFeePerGasGwei }) => {
-      if (chainId !== 8453) {
-        return {
-          content: [{ type: "text", text: `Only Base (chainId 8453) is supported. Got: ${chainId}` }],
-          isError: true,
-        };
-      }
-
+    async ({ to, data, value, nonce, maxFeePerGasGwei, maxPriorityFeePerGasGwei }) => {
       const fromAddress = agentAddress;
       if (!fromAddress || fromAddress === "unknown" || fromAddress.includes("unknown")) {
         return {
@@ -123,9 +126,29 @@ export function registerTransactionTools(server, { owsExec, readApiKey, walletNa
 
       try {
         const publicClient = getPublicClient();
-
         const maxFeePerGas = maxFeePerGasGwei ? parseGwei(maxFeePerGasGwei) : undefined;
         const maxPriorityFeePerGas = maxPriorityFeePerGasGwei ? parseGwei(maxPriorityFeePerGasGwei) : undefined;
+
+        let outerTo = to;
+        let outerData = data;
+        let outerValue = value;
+        let accountNonce;
+
+        if (aaAccount) {
+          const aaResult = await buildAATransaction({
+            publicClient,
+            owsExec,
+            readApiKey,
+            walletName,
+            accountAddress: aaAccount,
+            chainId: activeChainId,
+            calls: [{ target: to, value, data }],
+          });
+          outerTo = aaResult.outerTo;
+          outerData = aaResult.outerData;
+          outerValue = aaResult.outerValue;
+          accountNonce = aaResult.accountNonce;
+        }
 
         const { txHash, nonce: usedNonce, rawOutput } = await buildAndBroadcast({
           publicClient,
@@ -133,10 +156,12 @@ export function registerTransactionTools(server, { owsExec, readApiKey, walletNa
           readApiKey,
           walletName,
           fromAddress,
-          to,
-          data,
-          value,
-          chainId,
+          to: outerTo,
+          data: outerData,
+          value: outerValue,
+          chainId: activeChainId,
+          chainName: chainName(activeChainId),
+          rpcUrl: RPC_URL,
           nonce,
           maxFeePerGas,
           maxPriorityFeePerGas,
@@ -161,15 +186,18 @@ export function registerTransactionTools(server, { owsExec, readApiKey, walletNa
           receiptText = "  Status: pending (receipt not yet available)";
         }
 
-        const text = [
-          `Transaction broadcast via OWS`,
+        const lines = [
+          aaAccount ? `Transaction broadcast via AA (IsolatedAccount)` : `Transaction broadcast via OWS`,
           `  Hash: ${txHash}`,
-          `  Nonce: ${usedNonce}`,
-          receiptText,
-          `  Explorer: https://basescan.org/tx/${txHash}`,
-        ].join("\n");
+          `  EOA Nonce: ${usedNonce}`,
+        ];
+        if (accountNonce !== undefined) {
+          lines.push(`  AA Account Nonce: ${accountNonce.toString()}`);
+        }
+        lines.push(receiptText);
+        lines.push(`  Explorer: ${explorerTxUrl(txHash)}`);
 
-        return { content: [{ type: "text", text }] };
+        return { content: [{ type: "text", text: lines.join("\n") }] };
       } catch (err) {
         return {
           content: [{ type: "text", text: `Transaction failed: ${err.message}` }],
@@ -189,7 +217,7 @@ export function registerTransactionTools(server, { owsExec, readApiKey, walletNa
       maxFeePerGasGwei: z
         .string()
         .optional()
-        .describe("Max fee per gas in gwei. Defaults to 2x the current network fee to ensure replacement"),
+        .describe("Max fee per gas in gwei. Defaults to 3x the current network fee to ensure replacement"),
     },
     async ({ nonce, maxFeePerGasGwei }) => {
       const fromAddress = agentAddress;
@@ -223,7 +251,9 @@ export function registerTransactionTools(server, { owsExec, readApiKey, walletNa
           to: fromAddress,
           data: "0x",
           value: "0",
-          chainId: 8453,
+          chainId: activeChainId,
+          chainName: chainName(activeChainId),
+          rpcUrl: RPC_URL,
           nonce,
           maxFeePerGas,
           maxPriorityFeePerGas,
@@ -253,7 +283,7 @@ export function registerTransactionTools(server, { owsExec, readApiKey, walletNa
           `Cancellation tx broadcast (0 ETH self-transfer at nonce ${nonce})`,
           `  Hash: ${txHash}`,
           receiptText,
-          `  Explorer: https://basescan.org/tx/${txHash}`,
+          `  Explorer: ${explorerTxUrl(txHash)}`,
           ``,
           `The stuck nonce ${nonce} should now be cleared. You can retry the original transaction.`,
         ].join("\n");
@@ -270,7 +300,7 @@ export function registerTransactionTools(server, { owsExec, readApiKey, walletNa
 
   server.tool(
     "get_pending_nonce",
-    "Get the current and pending nonce for the agent wallet on Base. If pending > confirmed, there are stuck transactions in the mempool.",
+    "Get the current and pending nonce for the agent wallet. If pending > confirmed, there are stuck transactions in the mempool.",
     {},
     async () => {
       const fromAddress = agentAddress;
@@ -309,7 +339,7 @@ export function registerTransactionTools(server, { owsExec, readApiKey, walletNa
 
   server.tool(
     "get_transaction",
-    "Get details of a transaction by hash on Base.",
+    "Get details of a transaction by hash.",
     {
       hash: z.string().describe("Transaction hash"),
     },
@@ -336,7 +366,7 @@ export function registerTransactionTools(server, { owsExec, readApiKey, walletNa
           lines.push(`  Effective gas price: ${receipt.effectiveGasPrice.toString()}`);
         }
 
-        lines.push(`  Explorer: https://basescan.org/tx/${hash}`);
+        lines.push(`  Explorer: ${explorerTxUrl(hash)}`);
         return { content: [{ type: "text", text: lines.join("\n") }] };
       } catch (err) {
         return {
