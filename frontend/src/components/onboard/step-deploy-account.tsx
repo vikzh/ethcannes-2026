@@ -101,6 +101,7 @@ export function StepDeployAccount({
       args: [
         salt,
         deployment.contracts.PolicyHookRuleSpend,
+        deployment.contracts.WhitelistRequestModule,
         modules,
         agentAddress as Address,
         deployment.contracts.AgentSessionValidator,
