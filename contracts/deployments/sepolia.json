@@ -23,6 +23,22 @@
     "AbstractAccountFactory": {
       "address": "0xD2d478f45642B1cb87Ed70C7feF7BE714f833932",
       "deploymentBlock": 10584569
+    },
+    "MockERC20": {
+      "address": "0x55b58DA1d2022EEa77e67c449F7fc99F17446229",
+      "deploymentBlock": 10584729
+    },
+    "MockERC20_1": {
+      "address": "0xF29934Cc706E20ddA4Ba265FdE0d69c2e35E3988",
+      "deploymentBlock": 10584792
+    },
+    "MockERC20_2": {
+      "address": "0x8F2b6cCacC9673BfB9A3df721E0436D00ed4620D",
+      "deploymentBlock": 10584796
+    },
+    "MockERC20_3": {
+      "address": "0xD62E6474E2b1c84AFFE9a01819329bE93ebEaFEA",
+      "deploymentBlock": 10584798
     }
   }
 }
