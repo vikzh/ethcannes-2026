@@ -71,73 +71,133 @@ done
 # First-run installation flow
 # ---------------------------------------------------------------------------
 run_first_install() {
-  printf "\n${_BOLD}Agent Wallet Installer${_RESET}\n"
-  printf "======================\n\n"
+  local _install_start
+  _install_start=$(date +%s)
+  local _custom_install=false
+
+  print_header
+
+  # Install mode selection
+  if [[ "${AGENT_NON_INTERACTIVE:-0}" != "1" ]]; then
+    printf "  ${_BOLD}[1]${_RESET} Default install  ${_DIM}(agent-wallet, all detected agents)${_RESET}\n" >&2
+    printf "  ${_BOLD}[2]${_RESET} Custom install   ${_DIM}(choose wallet name, select agents)${_RESET}\n" >&2
+    printf "\n" >&2
+    local _mode_choice
+    printf "Select [1]: " >&2
+    read -r _mode_choice
+    if [[ "$_mode_choice" == "2" ]]; then
+      _custom_install=true
+    fi
+    printf "\n" >&2
+  fi
 
   # Step 1: Platform check
-  print_step 1 $TOTAL_STEPS "Checking platform..."
-  if ! detect_platform; then
+  step_start 1 "Checking platform"
+  if ! detect_platform 2>/dev/null; then
+    step_fail 1 "Checking platform" "macOS required"
     exit 1
   fi
-  print_step 1 $TOTAL_STEPS "Checking platform..." "ok"
+  step_done 1 "Checking platform" "$(uname -s) · $(uname -m)"
 
   # Step 2: OWS check/install
-  print_step 2 $TOTAL_STEPS "Checking OWS..."
+  step_start 2 "Checking OWS"
   if check_ows_installed; then
-    print_step 2 $TOTAL_STEPS "Checking OWS... $(get_ows_version)" "ok"
+    step_done 2 "OWS" "$(get_ows_version)"
   else
-    print_step 2 $TOTAL_STEPS "Installing OWS..."
-    if ! install_ows; then
+    _spinner_stop
+    step_start 2 "Installing OWS"
+    if ! install_ows_quiet; then
+      step_fail 2 "Installing OWS"
       exit 2
     fi
-    print_step 2 $TOTAL_STEPS "OWS installed" "ok"
+    step_done 2 "OWS installed" "$(get_ows_version)"
   fi
+  # OWS installer (or a prior install) sprays SKILL.md and potentially MCP
+  # entries into agent config dirs. We use our own MCP server — strip theirs.
+  clean_ows_agent_artifacts
 
   # Step 3: Node.js check
-  print_step 3 $TOTAL_STEPS "Checking Node.js..."
+  step_start 3 "Checking Node.js"
   if check_node_installed; then
-    print_step 3 $TOTAL_STEPS "Checking Node.js... $(node --version 2>/dev/null)" "ok"
+    step_done 3 "Node.js" "$(node --version 2>/dev/null)"
   else
-    print_error "Node.js is required for the MCP server. Install from https://nodejs.org"
+    step_fail 3 "Node.js" "Required for MCP server. Install from https://nodejs.org"
     exit 5
   fi
 
   # Step 4: Wallet creation
-  print_step 4 $TOTAL_STEPS "Creating wallet..."
-  WALLET_NAME=$(prompt "Wallet name" "$WALLET_NAME")
+  _spinner_stop
+  if [[ "$_custom_install" == "true" ]]; then
+    WALLET_NAME=$(prompt "Wallet name" "$WALLET_NAME")
+  fi
+  step_start 4 "Creating wallet '${WALLET_NAME}'"
   local agent_address
-  agent_address=$(create_wallet "$WALLET_NAME") || exit 3
-  print_step 4 $TOTAL_STEPS "Wallet created: ${agent_address}" "ok"
+  local _wallet_output_file
+  _wallet_output_file=$(mktemp)
+  local _wallet_flags=""
+  if [[ "$_custom_install" != "true" ]]; then
+    _wallet_flags="--use-existing"
+  fi
+  if agent_address=$(create_wallet "$WALLET_NAME" $_wallet_flags 2>"$_wallet_output_file"); then
+    step_done 4 "Wallet created" "${agent_address}"
+    rm -f "$_wallet_output_file"
+  else
+    local _wallet_err
+    _wallet_err=$(cat "$_wallet_output_file" 2>/dev/null || true)
+    rm -f "$_wallet_output_file"
+    step_fail 4 "Wallet creation failed" "$_wallet_err"
+    exit 3
+  fi
 
   # Step 5: Chain policy
-  print_step 5 $TOTAL_STEPS "Setting up chain policy..."
-  if ! create_policy; then
+  step_start 5 "Setting up chain policy"
+  local _policy_output_file
+  _policy_output_file=$(mktemp)
+  if create_policy > "$_policy_output_file" 2>&1; then
+    step_done 5 "Chain policy" "Base + Base Sepolia"
+    rm -f "$_policy_output_file"
+  else
+    local _pol_err
+    _pol_err=$(cat "$_policy_output_file" 2>/dev/null || true)
+    rm -f "$_policy_output_file"
+    step_fail 5 "Chain policy" "$_pol_err"
     exit 5
   fi
-  print_step 5 $TOTAL_STEPS "Chain policy: Base + Base Sepolia" "ok"
 
   # Step 6: API key
-  print_step 6 $TOTAL_STEPS "Generating API key..."
+  step_start 6 "Generating API key"
   local key_file
-  key_file=$(create_api_key "$WALLET_NAME") || exit 4
-  print_step 6 $TOTAL_STEPS "API key saved to ${key_file}" "ok"
+  local _key_output_file
+  _key_output_file=$(mktemp)
+  if key_file=$(create_api_key "$WALLET_NAME" 2>"$_key_output_file"); then
+    step_done 6 "API key saved" "${_DIM}${key_file}${_RESET}"
+    rm -f "$_key_output_file"
+  else
+    local _key_err
+    _key_err=$(cat "$_key_output_file" 2>/dev/null || true)
+    rm -f "$_key_output_file"
+    step_fail 6 "API key generation failed" "$_key_err"
+    exit 4
+  fi
 
   # Step 7: MCP server setup
-  print_step 7 $TOTAL_STEPS "Setting up MCP server..."
-  if ! install_mcp_deps; then
+  step_start 7 "Installing MCP server dependencies"
+  if install_mcp_deps_quiet; then
+    step_done 7 "MCP server ready"
+  else
+    step_fail 7 "MCP server setup failed"
     exit 5
   fi
-  print_step 7 $TOTAL_STEPS "MCP server ready" "ok"
 
   # Step 8: Agent registration (MCP)
-  print_step 8 $TOTAL_STEPS "Registering with agents..."
+  _spinner_stop
   local agents_str
   agents_str=$(detect_agents)
   local selected_agents=""
   if [[ -z "$agents_str" ]]; then
-    print_warning "No supported agents detected. You can register MCP manually later."
-  else
-    # Build display names for detected agents
+    step_skip 8 "Agent registration" "No agents detected"
+  elif [[ "$_custom_install" == "true" ]]; then
+    # Custom: let user pick which agents
     local agents_display=""
     for a in $agents_str; do
       local dn
@@ -156,7 +216,6 @@ run_first_install() {
       fi
     else
       print_info "Detected: ${agents_display}"
-      # Build label array for prompt_select
       local agent_labels=()
       for a in $agents_str; do
         agent_labels+=("$(get_agent_display_name "$a")")
@@ -166,15 +225,30 @@ run_first_install() {
     fi
 
     if [[ -n "$selected_agents" ]]; then
+      step_start 8 "Registering MCP with agents"
       for agent in $selected_agents; do
         register_mcp "$agent" "$WALLET_NAME"
       done
       local agent_count_selected
       agent_count_selected=$(echo "$selected_agents" | wc -w | tr -d ' ')
-      print_step 8 $TOTAL_STEPS "${agent_count_selected} agent(s) configured (MCP)" "ok"
+      step_done 8 "Agent(s) configured" "${agent_count_selected} via MCP"
     else
-      print_step 8 $TOTAL_STEPS "No agents configured" "skip"
+      step_skip 8 "Agent registration" "None selected"
     fi
+  else
+    # Default: register all detected agents
+    selected_agents="$agents_str"
+    step_start 8 "Registering MCP with agents"
+    for agent in $selected_agents; do
+      register_mcp "$agent" "$WALLET_NAME"
+    done
+    local agents_display=""
+    for a in $selected_agents; do
+      local dn
+      dn=$(get_agent_display_name "$a")
+      agents_display="${agents_display:+$agents_display, }${dn}"
+    done
+    step_done 8 "Agent(s) configured" "${agents_display}"
   fi
 
   # Write state
@@ -183,10 +257,21 @@ run_first_install() {
   write_state "$WALLET_NAME" "$agent_address" "$POLICY_ID" "$KEY_NAME" "$DEFAULT_ALLOWED_CHAINS" "$agents_json"
 
   # Summary
-  printf "\n${_BOLD}Installation complete!${_RESET}\n\n"
-  printf "  Agent wallet address: ${_GREEN}%s${_RESET}\n" "$agent_address"
-  printf "  Wallet name:          %s\n" "$WALLET_NAME"
-  printf "\nSave this address -- you'll need it for AA contract setup.\n\n"
+  local _install_end
+  _install_end=$(date +%s)
+  local _total_elapsed=$((_install_end - _install_start))
+
+  # Build agents display for summary
+  local summary_agents=""
+  if [[ -n "$selected_agents" ]]; then
+    for a in $selected_agents; do
+      local dn
+      dn=$(get_agent_display_name "$a")
+      summary_agents="${summary_agents:+$summary_agents, }${dn}"
+    done
+  fi
+
+  print_summary_box "$agent_address" "$WALLET_NAME" "$summary_agents" "$_total_elapsed"
 }
 
 # ---------------------------------------------------------------------------
@@ -239,11 +324,12 @@ run_self_test() {
   local test_fail=0
   local test_wallet="self-test-$$"
 
-  _st_pass() { test_pass=$((test_pass + 1)); printf "  PASS: %s\n" "$1"; }
-  _st_fail() { test_fail=$((test_fail + 1)); printf "  FAIL: %s\n" "$1"; }
+  _st_pass() { test_pass=$((test_pass + 1)); printf "  ${_SYM_OK} %s\n" "$1" >&2; }
+  _st_fail() { test_fail=$((test_fail + 1)); printf "  ${_SYM_FAIL} %s\n" "$1" >&2; }
 
-  printf "\n%sSelf-Test: Agent Wallet Installer%s\n" "$_BOLD" "$_RESET"
-  printf "==================================\n\n"
+  printf "\n" >&2
+  printf "  ${_BOLD}Self-Test: Agent Wallet Installer${_RESET}\n" >&2
+  printf "\n" >&2
 
   # Use a temp HOME to avoid polluting real config
   local original_home="$HOME"
@@ -258,7 +344,7 @@ run_self_test() {
     _st_fail "OWS binary not found at ${ows_bin}"
     export HOME="$original_home"
     rm -rf "$test_home"
-    printf "\n%d passed, %d failed\n" "$test_pass" "$test_fail"
+    printf "\n  %d passed, %d failed\n" "$test_pass" "$test_fail" >&2
     return 1
   fi
   # Symlink ows binary into test home
@@ -282,7 +368,7 @@ run_self_test() {
   trap _st_cleanup EXIT
 
   # --- Test 1: First-run install ---
-  printf "Phase 1: First-run install\n"
+  printf "  ${_BOLD}Phase 1: First-run install${_RESET}\n" >&2
   WALLET_NAME="$test_wallet"
   set +e
   run_first_install 2>&1
@@ -294,7 +380,7 @@ run_self_test() {
   else
     _st_fail "First-run failed (exit $rc)"
     _st_cleanup
-    printf "\n%d passed, %d failed\n" "$test_pass" "$test_fail"
+    printf "\n  %d passed, %d failed\n" "$test_pass" "$test_fail" >&2
     return 1
   fi
 
@@ -378,7 +464,7 @@ run_self_test() {
   fi
 
   # --- Test 2: Re-run detects existing install ---
-  printf "\nPhase 2: Idempotent re-run detection\n"
+  printf "\n  ${_BOLD}Phase 2: Idempotent re-run detection${_RESET}\n" >&2
   local install_state
   install_state=$(detect_installation)
   if [[ "$install_state" == "complete" ]]; then
@@ -388,7 +474,7 @@ run_self_test() {
   fi
 
   # --- Test 3: Management operations ---
-  printf "\nPhase 3: Management operations\n"
+  printf "\n  ${_BOLD}Phase 3: Management operations${_RESET}\n" >&2
 
   # Status
   set +e
@@ -413,13 +499,14 @@ run_self_test() {
   fi
 
   # --- Test 4: Reinstall ---
-  printf "\nPhase 4: --reinstall\n"
+  printf "\n  ${_BOLD}Phase 4: --reinstall${_RESET}\n" >&2
 
   # Run reinstall (which uninstalls + installs fresh)
+  # Use --keep-ows so OWS binary stays available for the fresh install
   set +e
   WALLET_NAME="$test_wallet"
   FORCE_REINSTALL=0  # Don't use the flag, simulate it
-  do_uninstall_cleanup 2>&1
+  do_uninstall_cleanup --keep-ows 2>&1
   # Also force-clean by wallet name (like --reinstall does)
   if ows wallet list 2>/dev/null | grep -q "Name:.*${test_wallet}$"; then
     echo "" | OWS_PASSPHRASE="" ows wallet delete --wallet "$test_wallet" --confirm 2>/dev/null || true
@@ -473,7 +560,7 @@ run_self_test() {
   fi
 
   # --- Test 5: Final uninstall ---
-  printf "\nPhase 5: Full uninstall\n"
+  printf "\n  ${_BOLD}Phase 5: Full uninstall${_RESET}\n" >&2
   set +e
   do_uninstall_cleanup 2>&1
   if ows wallet list 2>/dev/null | grep -q "Name:.*${test_wallet}$"; then
@@ -492,7 +579,13 @@ run_self_test() {
   fi
 
   # Summary
-  printf "\n%sSelf-test results: %d passed, %d failed%s\n" "$_BOLD" "$test_pass" "$test_fail" "$_RESET"
+  printf "\n" >&2
+  if [[ $test_fail -gt 0 ]]; then
+    printf "  ${_RED}${_BOLD}%d passed, %d failed${_RESET}\n" "$test_pass" "$test_fail" >&2
+  else
+    printf "  ${_GREEN}${_BOLD}%d passed, %d failed${_RESET}\n" "$test_pass" "$test_fail" >&2
+  fi
+  printf "\n" >&2
   trap - EXIT
   export HOME="$original_home"
   rm -rf "$test_home"
@@ -519,8 +612,8 @@ main() {
   # Force reinstall mode
   if [[ "$FORCE_REINSTALL" == "1" ]]; then
     print_info "Removing existing installation..."
-    # Clean up via state file if available
-    do_uninstall_cleanup
+    # Clean up wallet/policy/key/MCP but keep OWS (will be reused)
+    do_uninstall_cleanup --keep-ows
     # Also try to clean up by wallet name in case state was missing or incomplete
     local target_wallet="$WALLET_NAME"
     if ows wallet list 2>/dev/null | grep -q "Name:.*${target_wallet}$"; then
@@ -547,7 +640,7 @@ main() {
     partial)
       print_warning "Previous installation detected but appears incomplete."
       if prompt_confirm "Start fresh installation?"; then
-        do_uninstall_cleanup
+        do_uninstall_cleanup --keep-ows
         run_first_install
       else
         print_info "Run the installer again when ready."

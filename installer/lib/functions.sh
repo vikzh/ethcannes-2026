@@ -13,7 +13,7 @@ DEFAULT_WALLET_NAME="agent-wallet"
 get_agent_display_name() {
   case "$1" in
     openclaw) echo "OpenClaw" ;;
-    claude)   echo "Claude Coworker" ;;
+    claude)   echo "Claude Code/Cowork" ;;
     codex)    echo "Codex" ;;
     *)        echo "$1" ;;
   esac
@@ -47,9 +47,8 @@ check_ows_installed() {
   command -v ows &>/dev/null
 }
 
-# install_ows -- installs OWS via official installer
+# install_ows -- installs OWS via official installer (with output)
 install_ows() {
-  print_info "Installing OWS..."
   if ! curl -fsSL https://docs.openwallet.sh/install.sh | bash; then
     print_error "Failed to install OWS. Visit https://openwallet.sh for help."
     return 1
@@ -60,7 +59,178 @@ install_ows() {
     print_error "OWS installed but 'ows' not found in PATH."
     return 1
   fi
-  print_success "OWS installed ($(ows --version 2>/dev/null || echo 'unknown version'))"
+}
+
+# install_ows_quiet -- installs OWS with output captured (for TUI spinner)
+install_ows_quiet() {
+  local _out_file
+  _out_file=$(mktemp)
+  if curl -fsSL https://docs.openwallet.sh/install.sh 2>/dev/null | bash > "$_out_file" 2>&1; then
+    rm -f "$_out_file"
+  else
+    # Show captured output on failure
+    if [[ -s "$_out_file" ]]; then
+      while IFS= read -r line; do
+        printf "    ${_DIM}%s${_RESET}\n" "$line" >&2
+      done < "$_out_file"
+    fi
+    rm -f "$_out_file"
+    return 1
+  fi
+  # Reload PATH to pick up newly installed binary
+  export PATH="${HOME}/.ows/bin:${PATH}"
+  if ! command -v ows &>/dev/null; then
+    return 1
+  fi
+}
+
+# remove_ows_skills -- removes OWS skill files from all known agent directories
+# The OWS installer drops SKILL.md + references into every detected agent's
+# skill dir. We use MCP instead, so these are dead weight.
+remove_ows_skills() {
+  local dirs=(
+    "${HOME}/.agents/skills/ows"
+    "${HOME}/.claude/skills/ows"
+    "${HOME}/.config/agents/skills/ows"
+    "${HOME}/.cursor/skills/ows"
+    "${HOME}/.copilot/skills/ows"
+    "${HOME}/.codex/skills/ows"
+    "${HOME}/.gemini/skills/ows"
+    "${HOME}/.config/opencode/skills/ows"
+    "${HOME}/.config/goose/skills/ows"
+    "${HOME}/.windsurf/skills/ows"
+    "${HOME}/.codeium/windsurf/skills/ows"
+    "${HOME}/.continue/skills/ows"
+    "${HOME}/.roo/skills/ows"
+    "${HOME}/.kiro/skills/ows"
+    "${HOME}/.augment/skills/ows"
+    "${HOME}/.trae/skills/ows"
+  )
+  for dir in "${dirs[@]}"; do
+    if [[ -d "$dir" ]]; then
+      rm -rf "$dir"
+    fi
+  done
+}
+
+# remove_ows_mcp -- removes any "ows" MCP server entries from agent configs
+# OWS does not currently register MCP servers, but this is defensive against
+# future OWS versions that might. Strips "ows" key from MCP config sections.
+remove_ows_mcp() {
+  # OpenClaw: mcp.servers.ows in JSON
+  local openclaw_config="${HOME}/.openclaw/openclaw.json"
+  if [[ -f "$openclaw_config" ]]; then
+    python3 -c "
+import json
+with open('${openclaw_config}') as f:
+    cfg = json.load(f)
+if 'mcp' in cfg and 'servers' in cfg['mcp']:
+    cfg['mcp']['servers'].pop('ows', None)
+with open('${openclaw_config}', 'w') as f:
+    json.dump(cfg, f, indent=2)
+" 2>/dev/null || true
+  fi
+
+  # Claude Code: try CLI first, then manual config
+  if command -v claude &>/dev/null; then
+    claude mcp remove ows &>/dev/null || true
+  fi
+  local claude_config="${HOME}/.claude.json"
+  if [[ -f "$claude_config" ]]; then
+    python3 -c "
+import json
+with open('${claude_config}') as f:
+    cfg = json.load(f)
+changed = False
+if 'mcpServers' in cfg:
+    if 'ows' in cfg['mcpServers']:
+        del cfg['mcpServers']['ows']
+        changed = True
+# Also check per-project configs
+for key in list(cfg.keys()):
+    if key.startswith('/') and isinstance(cfg[key], dict):
+        servers = cfg[key].get('mcpServers', {})
+        if 'ows' in servers:
+            del servers['ows']
+            changed = True
+if changed:
+    with open('${claude_config}', 'w') as f:
+        json.dump(cfg, f, indent=2)
+" 2>/dev/null || true
+  fi
+
+  # Claude Desktop
+  local desktop_config="${HOME}/Library/Application Support/Claude/claude_desktop_config.json"
+  if [[ -f "$desktop_config" ]]; then
+    python3 -c "
+import json
+with open('${desktop_config}') as f:
+    cfg = json.load(f)
+if 'mcpServers' in cfg and 'ows' in cfg['mcpServers']:
+    del cfg['mcpServers']['ows']
+    with open('${desktop_config}', 'w') as f:
+        json.dump(cfg, f, indent=2)
+" 2>/dev/null || true
+  fi
+
+  # Codex: [mcp_servers.ows] in TOML
+  local codex_config="${HOME}/.codex/config.toml"
+  if [[ -f "$codex_config" ]] && grep -q '\[mcp_servers\.ows\]' "$codex_config" 2>/dev/null; then
+    python3 -c "
+import re
+with open('${codex_config}') as f:
+    content = f.read()
+content = re.sub(r'\n?\[mcp_servers\.ows\].*?(?=\n\[|\Z)', '', content, flags=re.DOTALL)
+with open('${codex_config}', 'w') as f:
+    f.write(content.rstrip() + '\n')
+" 2>/dev/null || true
+  fi
+
+  # OpenCode: mcp.servers.ows or mcpServers.ows in JSON
+  local opencode_config="${HOME}/.config/opencode/config.json"
+  if [[ -f "$opencode_config" ]]; then
+    python3 -c "
+import json
+with open('${opencode_config}') as f:
+    cfg = json.load(f)
+changed = False
+if 'mcp' in cfg and 'servers' in cfg['mcp'] and 'ows' in cfg['mcp']['servers']:
+    del cfg['mcp']['servers']['ows']
+    changed = True
+if 'mcpServers' in cfg and 'ows' in cfg['mcpServers']:
+    del cfg['mcpServers']['ows']
+    changed = True
+if changed:
+    with open('${opencode_config}', 'w') as f:
+        json.dump(cfg, f, indent=2)
+" 2>/dev/null || true
+  fi
+}
+
+# clean_ows_agent_artifacts -- removes all OWS-installed agent artifacts
+# Combines skill file removal + MCP deregistration. Called unconditionally
+# during install (whether OWS was pre-existing or freshly installed) and
+# during uninstall.
+clean_ows_agent_artifacts() {
+  remove_ows_skills
+  remove_ows_mcp
+}
+
+# uninstall_ows -- removes OWS binary, PATH entries, and language bindings
+# Optionally purges vault data (~/.ows/).
+uninstall_ows() {
+  local purge="${1:-false}"
+  if ! command -v ows &>/dev/null; then
+    return 0
+  fi
+  # Pipe 'y' to confirm -- ows uninstall has no --confirm flag
+  if [[ "$purge" == "true" ]]; then
+    echo "y" | ows uninstall --purge 2>/dev/null || true
+  else
+    echo "y" | ows uninstall 2>/dev/null || true
+  fi
+  # Remove all OWS agent artifacts (skills + MCP)
+  clean_ows_agent_artifacts
 }
 
 # get_ows_version -- prints OWS version string
@@ -92,17 +262,28 @@ _extract_evm_address() {
 # Wallet
 # ---------------------------------------------------------------------------
 
-# create_wallet wallet_name
+# create_wallet wallet_name [--use-existing]
 # Creates an OWS wallet and prints the EVM address to stdout.
+# If --use-existing is passed, silently reuse an existing wallet without prompting.
 # Returns 0 on success, 3 on failure.
 create_wallet() {
   local wallet_name="$1"
+  local use_existing=false
+  if [[ "${2:-}" == "--use-existing" ]]; then
+    use_existing=true
+  fi
 
   # Check if wallet already exists
   local wallet_list
   wallet_list=$(ows wallet list 2>/dev/null || true)
   if echo "$wallet_list" | grep -q "Name:.*${wallet_name}$"; then
-    if prompt_confirm "Wallet '${wallet_name}' already exists. Use it?"; then
+    local should_use=false
+    if [[ "$use_existing" == "true" ]]; then
+      should_use=true
+    elif prompt_confirm "Wallet '${wallet_name}' already exists. Use it?"; then
+      should_use=true
+    fi
+    if [[ "$should_use" == "true" ]]; then
       # Extract EVM address from wallet list output.
       # For multiple wallets, isolate the section for our wallet by taking
       # lines from "Name: <wallet_name>" until the next blank line or EOF,
@@ -307,7 +488,7 @@ get_mcp_server_path() {
   echo "${script_dir}/mcp-server/index.js"
 }
 
-# install_mcp_deps -- runs npm install in mcp-server directory
+# install_mcp_deps -- runs npm install in mcp-server directory (with output)
 install_mcp_deps() {
   local mcp_dir
   mcp_dir="$(dirname "$(get_mcp_server_path)")"
@@ -319,6 +500,28 @@ install_mcp_deps() {
     print_error "Failed to install MCP server dependencies."
     return 1
   }
+}
+
+# install_mcp_deps_quiet -- runs npm install with output captured (for TUI spinner)
+install_mcp_deps_quiet() {
+  local mcp_dir
+  mcp_dir="$(dirname "$(get_mcp_server_path)")"
+  if [[ ! -f "${mcp_dir}/package.json" ]]; then
+    return 1
+  fi
+  local _out_file
+  _out_file=$(mktemp)
+  if (cd "$mcp_dir" && npm install --silent > "$_out_file" 2>&1); then
+    rm -f "$_out_file"
+  else
+    if [[ -s "$_out_file" ]]; then
+      while IFS= read -r line; do
+        printf "    ${_DIM}%s${_RESET}\n" "$line" >&2
+      done < "$_out_file"
+    fi
+    rm -f "$_out_file"
+    return 1
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -405,7 +608,7 @@ MCPEOF
 }
 
 # register_mcp_claude wallet_name
-# Claude Coworker uses claude_desktop_config.json for MCP servers.
+# Claude Code/Cowork uses claude_desktop_config.json for MCP servers.
 # Claude Code CLI uses ~/.claude.json via `claude mcp add`.
 register_mcp_claude() {
   local wallet_name="$1"
@@ -708,12 +911,12 @@ reinstall_mcp() {
 }
 
 # fresh_reinstall
-# Full uninstall + fresh first-run.
+# Full uninstall + fresh first-run. Keeps OWS since it will be reused.
 fresh_reinstall() {
   if ! prompt_confirm "This will delete your agent wallet, keys, and MCP config. Continue?" "n"; then
     return 0
   fi
-  do_uninstall_cleanup
+  do_uninstall_cleanup --keep-ows
   return 2  # Signal to caller to run first-run flow
 }
 
@@ -737,9 +940,16 @@ full_uninstall() {
   print_success "Uninstall complete."
 }
 
-# do_uninstall_cleanup
+# do_uninstall_cleanup [--keep-ows]
 # Internal: performs the actual uninstall steps.
+# Removes: wallet, policy, key, MCP registrations, OWS skills, state.
+# Unless --keep-ows is passed, also removes OWS binary + vault + bindings.
 do_uninstall_cleanup() {
+  local keep_ows=false
+  if [[ "${1:-}" == "--keep-ows" ]]; then
+    keep_ows=true
+  fi
+
   if read_state; then
     local wallet_name
     wallet_name=$(get_state_field "wallet_name")
@@ -760,6 +970,14 @@ do_uninstall_cleanup() {
 
     # Deregister MCP from all agents
     deregister_all_mcp
+  fi
+
+  # Remove all OWS agent artifacts (skills + MCP entries)
+  clean_ows_agent_artifacts
+
+  # Uninstall OWS itself (binary, PATH entries, language bindings, vault data)
+  if [[ "$keep_ows" != "true" ]]; then
+    uninstall_ows "true"
   fi
 
   # Clear state

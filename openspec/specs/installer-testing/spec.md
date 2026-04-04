@@ -57,7 +57,7 @@ Tests SHALL verify MCP config is written for each agent type.
 - **WHEN** `register_mcp_openclaw` runs
 - **THEN** `~/.openclaw/openclaw.json` contains `agent-wallet` MCP server config
 
-#### Scenario: Claude Coworker MCP registered
+#### Scenario: Claude Code/Cowork MCP registered
 - **WHEN** `register_mcp_claude` runs
 - **THEN** `~/.claude.json` contains `agent-wallet` in `mcpServers`
 

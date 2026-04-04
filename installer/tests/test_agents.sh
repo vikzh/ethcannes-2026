@@ -36,7 +36,7 @@ setup_sandbox
 mock_no_agents
 mkdir -p "${HOME}/.claude"
 agents=$(detect_agents)
-assert_equals "claude" "$agents" "detect_agents finds Claude Coworker via directory"
+assert_equals "claude" "$agents" "detect_agents finds Claude Code/Cowork via directory"
 teardown_sandbox
 
 # Test: register_mcp_openclaw writes config with correct key path (mcp.servers, not mcpServers)

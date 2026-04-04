@@ -44,15 +44,15 @@ MCP (no skill file creation). The installer SHALL NOT create or manage SKILL.md
 files for any agent.
 
 - **OpenClaw**: `openclaw mcp set agent-wallet '{"command":"node","args":["/path/to/mcp-server/index.js"],"env":{"AGENT_WALLET_NAME":"<name>"}}'`
-- **Claude Coworker**: `claude mcp add agent-wallet --transport stdio --scope user -- node /path/to/mcp-server/index.js` (or write to `~/.claude.json` if `claude` CLI not in PATH)
+- **Claude Code/Cowork**: `claude mcp add agent-wallet --transport stdio --scope user -- node /path/to/mcp-server/index.js` (or write to `~/.claude.json` if `claude` CLI not in PATH)
 - **Codex**: Append `[mcp_servers.agent-wallet]` section to `~/.codex/config.toml`
 
 #### Scenario: MCP registered for OpenClaw
 - **WHEN** OpenClaw is detected and user confirms
 - **THEN** `openclaw mcp show agent-wallet` returns the server configuration
 
-#### Scenario: MCP registered for Claude Coworker
-- **WHEN** Claude Coworker is detected (via `~/.claude/` directory)
+#### Scenario: MCP registered for Claude Code/Cowork
+- **WHEN** Claude Code/Cowork is detected (via `~/.claude/` directory)
 - **THEN** the MCP config is written to `~/.claude.json` or via `claude mcp add`
 
 #### Scenario: MCP registered for Codex
@@ -158,7 +158,7 @@ Detection determines which agents to register MCP with.
 
 Detection logic:
 - **OpenClaw**: `command -v openclaw` OR `~/.openclaw/` exists
-- **Claude Coworker**: `command -v claude` OR `~/.claude/` exists
+- **Claude Code/Cowork**: `command -v claude` OR `~/.claude/` exists
 - **Codex**: `command -v codex` OR `~/.codex/` exists
 
 #### Scenario: Multiple agents detected
