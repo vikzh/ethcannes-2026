@@ -17,6 +17,7 @@ import { type Address, formatUnits } from "viem";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Header } from "@/components/header";
 import { AddRuleModal } from "@/components/add-rule-modal";
+import { CreateAccountModal } from "@/components/create-account-modal";
 import { SEPOLIA_TOKENS } from "@/lib/contracts";
 
 interface AccountData {
@@ -202,6 +203,7 @@ export function DashboardApp() {
   const [changelogLoading, setChangelogLoading] = useState(false);
   const [changelogError, setChangelogError] = useState<string | null>(null);
   const [addRuleAccount, setAddRuleAccount] = useState<AccountWithRules | null>(null);
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
   const reloadRules = useCallback(() => setHomeReloadKey((k) => k + 1), []);
   const hasAccount = accountData !== null;
   const resetDisconnectedState = () => {
@@ -705,6 +707,16 @@ export function DashboardApp() {
                 onClick={() => setActiveNav("changelog")}
               />
             </nav>
+            <div className="mt-4 px-3">
+              <button
+                type="button"
+                onClick={() => setShowCreateAccount(true)}
+                className="flex w-full items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+              >
+                <Plus className="h-4 w-4 opacity-70" />
+                New Account
+              </button>
+            </div>
           </div>
         </aside>}
 
@@ -770,6 +782,16 @@ export function DashboardApp() {
           policyHookAddress={addRuleAccount.policyHook as Address}
           onClose={() => setAddRuleAccount(null)}
           onSuccess={reloadRules}
+        />
+      )}
+
+      {showCreateAccount && (
+        <CreateAccountModal
+          onClose={() => setShowCreateAccount(false)}
+          onSuccess={() => {
+            setShowCreateAccount(false);
+            reloadRules();
+          }}
         />
       )}
     </div>
