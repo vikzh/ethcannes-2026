@@ -200,6 +200,13 @@ export const POLICY_HOOK_ABI = [
     ],
     outputs: [],
   },
+  {
+    name: "removeEqRule",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "ruleId", type: "bytes32" }],
+    outputs: [],
+  },
 ] as const;
 
 export const ERC20_ABI = [

@@ -8,17 +8,18 @@ import {
   Plus,
   RefreshCw,
   ShieldCheck,
+  Trash2,
   type LucideIcon,
 } from "lucide-react";
 import { startTransition, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAccount } from "wagmi";
-import { type Address, formatUnits } from "viem";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { type Address, encodeFunctionData, formatUnits } from "viem";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Header } from "@/components/header";
 import { AddRuleModal, type RulePrefill } from "@/components/add-rule-modal";
 import { CreateAccountModal } from "@/components/create-account-modal";
-import { SEPOLIA_TOKENS } from "@/lib/contracts";
+import { SEPOLIA_TOKENS, ISOLATED_ACCOUNT_ABI, POLICY_HOOK_ABI, MODE_SINGLE, encodeSingle } from "@/lib/contracts";
 
 interface AccountData {
   id: string;
@@ -214,7 +215,36 @@ export function DashboardApp() {
   const [addRuleAccount, setAddRuleAccount] = useState<AccountWithRules | null>(null);
   const [addRulePrefill, setAddRulePrefill] = useState<RulePrefill | undefined>(undefined);
   const [showCreateAccount, setShowCreateAccount] = useState(false);
+  const [removingRuleId, setRemovingRuleId] = useState<string | null>(null);
   const reloadRules = useCallback(() => setHomeReloadKey((k) => k + 1), []);
+
+  const { writeContract: writeRemoveRule, data: removeRuleTxHash, reset: resetRemoveRule } = useWriteContract();
+  const { isSuccess: removeRuleConfirmed } = useWaitForTransactionReceipt({ hash: removeRuleTxHash });
+
+  useEffect(() => {
+    if (removeRuleConfirmed) {
+      setRemovingRuleId(null);
+      resetRemoveRule();
+      reloadRules();
+    }
+  }, [removeRuleConfirmed, resetRemoveRule, reloadRules]);
+
+  function handleRemoveRule(accountAddress: Address, policyHookAddress: Address, ruleId: string) {
+    setRemovingRuleId(ruleId);
+    const hookCalldata = encodeFunctionData({
+      abi: POLICY_HOOK_ABI,
+      functionName: "removeEqRule",
+      args: [ruleId as `0x${string}`],
+    });
+    const executionCalldata = encodeSingle(policyHookAddress, BigInt(0), hookCalldata);
+    writeRemoveRule({
+      address: accountAddress,
+      abi: ISOLATED_ACCOUNT_ABI,
+      functionName: "execute",
+      args: [MODE_SINGLE, executionCalldata],
+      gas: BigInt(5_000_000),
+    });
+  }
   const hasAccount = accountData !== null;
   const resetDisconnectedState = () => {
     setAccountData(null);
@@ -579,16 +609,30 @@ export function DashboardApp() {
                             </div>
                           </div>
 
-                          {policy.addedTxHash && (
-                            <a
-                              href={`https://sepolia.etherscan.io/tx/${policy.addedTxHash}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-3 inline-block text-xs font-medium text-blue-600 underline decoration-blue-300 transition-colors hover:text-blue-800"
+                          <div className="mt-3 flex items-center justify-between">
+                            {policy.addedTxHash ? (
+                              <a
+                                href={`https://sepolia.etherscan.io/tx/${policy.addedTxHash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs font-medium text-blue-600 underline decoration-blue-300 transition-colors hover:text-blue-800"
+                              >
+                                View on Etherscan
+                              </a>
+                            ) : <span />}
+                            <button
+                              type="button"
+                              disabled={removingRuleId === policy.ruleId}
+                              onClick={() => handleRemoveRule(account.id as Address, account.policyHook as Address, policy.ruleId)}
+                              className="rounded-lg p-1.5 text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
                             >
-                              View on Etherscan
-                            </a>
-                          )}
+                              {removingRuleId === policy.ruleId ? (
+                                <LoaderCircle className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </button>
+                          </div>
                         </section>
                       ))}
                     </div>
