@@ -41,13 +41,33 @@ interface RuleData {
   updatedAt?: string | null;
 }
 
+interface PolicyRuleData {
+  id: string;
+  account: string;
+  ruleId: string;
+  target: string;
+  selector: string;
+  active: boolean;
+  spendParamIndex: string;
+  maxPerPeriod: string;
+  periodDuration: string;
+  addedAtTimestamp: string;
+  addedTxHash: string;
+  updatedAtTimestamp: string;
+  updatedTxHash: string;
+  actionLabel: string;
+  tokenLabel: string;
+}
+
 interface AccountsResponse {
   accounts: AccountData[];
   whitelistRequests: RuleData[];
+  policyRules: PolicyRuleData[];
 }
 
 interface AccountWithRules extends AccountData {
   rules: RuleData[];
+  policyRules: PolicyRuleData[];
 }
 
 interface ChangelogEvent {
@@ -107,6 +127,15 @@ async function fetchAccountsByOwner(
 type NavKey =
   | "rules"
   | "changelog";
+
+function formatDuration(seconds: string) {
+  const s = Number(seconds);
+  if (!Number.isFinite(s) || s === 0) return "No limit";
+  if (s >= 86400 && s % 86400 === 0) return `${s / 86400} day${s / 86400 === 1 ? "" : "s"}`;
+  if (s >= 3600 && s % 3600 === 0) return `${s / 3600} hour${s / 3600 === 1 ? "" : "s"}`;
+  if (s >= 60 && s % 60 === 0) return `${s / 60} minute${s / 60 === 1 ? "" : "s"}`;
+  return `${s}s`;
+}
 
 function formatTimestamp(value?: string | null) {
   if (!value) return "Unavailable";
@@ -231,6 +260,15 @@ export function DashboardApp() {
             rulesByAccount.set(key, existing);
           }
 
+          const policyRulesByAccount = new Map<string, PolicyRuleData[]>();
+
+          for (const rule of response.policyRules) {
+            const key = rule.account.toLowerCase();
+            const existing = policyRulesByAccount.get(key) ?? [];
+            existing.push(rule);
+            policyRulesByAccount.set(key, existing);
+          }
+
           const seen = new Set<string>();
           const uniqueAccounts = response.accounts.filter((account) => {
             const key = account.id.toLowerCase();
@@ -242,6 +280,7 @@ export function DashboardApp() {
           const groupedAccounts = uniqueAccounts.map((account) => ({
             ...account,
             rules: rulesByAccount.get(account.id.toLowerCase()) ?? [],
+            policyRules: policyRulesByAccount.get(account.id.toLowerCase()) ?? [],
           }));
 
           setHomeAccounts(groupedAccounts);
@@ -353,21 +392,21 @@ export function DashboardApp() {
               <div className="border-b border-zinc-200 bg-[linear-gradient(135deg,_rgba(244,244,245,0.95),_rgba(255,255,255,1))] p-6">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
-                      Account
-                    </p>
-                    <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950">
+                    <h2 className="text-2xl font-semibold tracking-tight text-zinc-950">
                       Account {index + 1}
                     </h2>
-                    <p className="mt-2 text-sm text-zinc-600">
-                      Approved actions available for this account.
-                    </p>
                   </div>
                   <div className="flex items-center gap-2 self-start">
                     <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
                       <ShieldCheck className="h-4 w-4" />
                       {account.rules.length} approved rule{account.rules.length === 1 ? "" : "s"}
                     </div>
+                    {account.policyRules.length > 0 && (
+                      <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-200">
+                        <ShieldCheck className="h-4 w-4" />
+                        {account.policyRules.length} polic{account.policyRules.length === 1 ? "y" : "ies"}
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={() => setAddRuleAccount(account)}
@@ -381,11 +420,7 @@ export function DashboardApp() {
               </div>
 
               <div className="p-6">
-                {account.rules.length === 0 ? (
-                  <div className="mt-4 rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-5 text-sm text-zinc-600">
-                    No approved whitelist requests were found for this account.
-                  </div>
-                ) : (
+                {account.rules.length > 0 && (
                   <div className="mt-4 space-y-3">
                     {account.rules.map((rule) => (
                       <section
@@ -453,6 +488,85 @@ export function DashboardApp() {
                         </div>
                       </section>
                     ))}
+                  </div>
+                )}
+
+                {account.policyRules.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                      Policy Rules
+                    </h3>
+                    <div className="mt-3 space-y-3">
+                      {account.policyRules.map((policy) => (
+                        <section
+                          key={policy.id}
+                          className="rounded-2xl border border-blue-200 bg-blue-50/50 p-5"
+                        >
+                          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div>
+                              <div className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${policy.active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-500"}`}>
+                                {policy.active ? "Active" : "Inactive"}
+                              </div>
+                              <h4 className="mt-3 text-base font-semibold text-zinc-950">
+                                {policy.tokenLabel}
+                              </h4>
+                              <p className="mt-1 text-sm text-zinc-600">
+                                {policy.actionLabel}
+                              </p>
+                            </div>
+                            <div className="text-xs text-zinc-500">
+                              Updated {formatTimestamp(policy.updatedAtTimestamp)}
+                            </div>
+                          </div>
+
+                          <div className="mt-4 grid gap-3 md:grid-cols-2">
+                            <div>
+                              <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                                Target
+                              </p>
+                              <p className="mt-1 truncate text-sm font-mono text-zinc-900">
+                                {policy.target}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                                Max Per Period
+                              </p>
+                              <p className="mt-1 text-sm text-zinc-900">
+                                {policy.maxPerPeriod === "0" ? "Unlimited" : policy.maxPerPeriod}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                                Period Duration
+                              </p>
+                              <p className="mt-1 text-sm text-zinc-900">
+                                {formatDuration(policy.periodDuration)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                                Added
+                              </p>
+                              <p className="mt-1 text-sm text-zinc-900">
+                                {formatTimestamp(policy.addedAtTimestamp)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {policy.addedTxHash && (
+                            <a
+                              href={`https://sepolia.etherscan.io/tx/${policy.addedTxHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-3 inline-block text-xs font-medium text-blue-600 underline decoration-blue-300 transition-colors hover:text-blue-800"
+                            >
+                              View on Etherscan
+                            </a>
+                          )}
+                        </section>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

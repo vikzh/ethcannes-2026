@@ -79,6 +79,24 @@ interface WhitelistRequest {
   updatedAt?: string | null;
 }
 
+interface PolicyRule {
+  id: string;
+  account: string;
+  ruleId: string;
+  target: string;
+  selector: string;
+  active: boolean;
+  spendParamIndex: string;
+  maxPerPeriod: string;
+  periodDuration: string;
+  addedAtBlock: string;
+  addedAtTimestamp: string;
+  addedTxHash: string;
+  updatedAtBlock: string;
+  updatedAtTimestamp: string;
+  updatedTxHash: string;
+}
+
 interface EnrichedWhitelistRequest extends WhitelistRequest {
   actionLabel: string;
   description: string;
@@ -87,10 +105,16 @@ interface EnrichedWhitelistRequest extends WhitelistRequest {
   tokenName: string;
 }
 
+interface EnrichedPolicyRule extends PolicyRule {
+  actionLabel: string;
+  tokenLabel: string;
+}
+
 interface TheGraphResponse {
   data?: {
     accounts?: AccountData[];
     whitelistRequests?: WhitelistRequest[];
+    policyRules?: PolicyRule[];
   };
   errors?: Array<{
     message?: string;
@@ -104,7 +128,7 @@ function parseBoolean(value: string | null, defaultValue: boolean) {
 
 function describeSelector(selector: string) {
   if (selector === "0x00000000") return "Native transfer";
-  if (selector === "0xa9059cbb") return "ERC-20 transfer(address,uint256)";
+  if (selector === "0xa9059cbb") return "ERC-20 transfer";
   return "Contract interaction";
 }
 
@@ -301,6 +325,72 @@ async function enrichRulesWithTokenMetadata(
   });
 }
 
+async function enrichPolicyRulesWithTokenMetadata(
+  rules: PolicyRule[],
+  chain: Chain,
+) {
+  const rpcUrl = resolveRpcUrl(chain);
+  const nativeTokenName = chain.nativeCurrency.name;
+  const knownTokenLabels = KNOWN_TOKEN_LABELS[chain.id] ?? {};
+
+  if (!rpcUrl) {
+    return rules.map<EnrichedPolicyRule>((rule) => ({
+      ...rule,
+      actionLabel: describeSelector(rule.selector),
+      tokenLabel:
+        rule.selector === "0x00000000"
+          ? nativeTokenName
+          : knownTokenLabels[rule.target.toLowerCase()] ?? "ERC-20 token",
+    }));
+  }
+
+  const publicClient = createPublicClient({
+    chain,
+    transport: http(rpcUrl, { timeout: 5_000 }),
+  });
+  const tokenNames = new Map<string, string>();
+
+  const uniqueTargets = [
+    ...new Set(
+      rules
+        .filter(
+          (rule) =>
+            rule.selector !== "0x00000000" &&
+            isAddress(rule.target),
+        )
+        .map((rule) => rule.target.toLowerCase()),
+    ),
+  ];
+
+  await Promise.all(
+    uniqueTargets.map(async (target) => {
+      const cachedTokenName = tokenMetadataCache.get(`${chain.id}:${target}`);
+
+      if (cachedTokenName) {
+        tokenNames.set(target, cachedTokenName);
+        return;
+      }
+
+      const tokenName = await readTokenLabel(publicClient, target as Address);
+      const resolvedTokenName =
+        knownTokenLabels[target] ?? tokenName ?? "ERC-20 token";
+      tokenNames.set(target, resolvedTokenName);
+      tokenMetadataCache.set(`${chain.id}:${target}`, resolvedTokenName);
+    }),
+  );
+
+  return rules.map<EnrichedPolicyRule>((rule) => ({
+    ...rule,
+    actionLabel: describeSelector(rule.selector),
+    tokenLabel:
+      rule.selector === "0x00000000"
+        ? nativeTokenName
+        : tokenNames.get(rule.target.toLowerCase()) ??
+          knownTokenLabels[rule.target.toLowerCase()] ??
+          "ERC-20 token",
+  }));
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const owner = searchParams.get("owner");
@@ -352,6 +442,27 @@ export async function GET(request: Request) {
           createdAt
           updatedAt
         }
+        policyRules(
+          first: 1000,
+          orderBy: addedAtTimestamp,
+          orderDirection: asc
+        ) {
+          id
+          account
+          ruleId
+          target
+          selector
+          active
+          spendParamIndex
+          maxPerPeriod
+          periodDuration
+          addedAtBlock
+          addedAtTimestamp
+          addedTxHash
+          updatedAtBlock
+          updatedAtTimestamp
+          updatedTxHash
+        }
       }`
     : `{
         accounts(
@@ -402,6 +513,7 @@ export async function GET(request: Request) {
       return Response.json({
         accounts,
         whitelistRequests: [],
+        policyRules: [],
       });
     }
 
@@ -409,14 +521,22 @@ export async function GET(request: Request) {
     const whitelistRequests = (payload.data?.whitelistRequests ?? []).filter(
       (rule) => accountIds.has(rule.account.toLowerCase()),
     );
+    const policyRules = (payload.data?.policyRules ?? []).filter(
+      (rule) => accountIds.has(rule.account.toLowerCase()),
+    );
     const enrichedRules = await enrichRulesWithTokenMetadata(
       whitelistRequests,
+      chain,
+    );
+    const enrichedPolicyRules = await enrichPolicyRulesWithTokenMetadata(
+      policyRules,
       chain,
     );
 
     return Response.json({
       accounts,
       whitelistRequests: enrichedRules,
+      policyRules: enrichedPolicyRules,
     });
   } catch {
     return Response.json(
