@@ -1,0 +1,10 @@
+{
+  "name": "agent-wallet-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for agent wallet signing via OWS",
+  "main": "index.js",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  }
+}

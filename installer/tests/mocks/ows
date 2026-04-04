@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# Mock OWS binary for testing
+# Records all invocations and returns deterministic output.
+
+MOCK_ADDRESS="0xA0E41234567890abcdef1234567890abcdef1234"
+MOCK_WALLET_ID="mock-uuid-1234-5678-abcd"
+MOCK_TOKEN="ows_key_mock_0000000000000000000000000000000000000000000000000000000000000000"
+MOCK_VERSION="0.2.18"
+
+# Record invocation
+if [[ -n "${MOCK_OWS_LOG:-}" ]]; then
+  echo "$*" >> "$MOCK_OWS_LOG"
+fi
+
+# Check for simulated failure
+CMD="$1 ${2:-}"
+if [[ -n "${MOCK_OWS_FAIL:-}" ]] && [[ "$CMD" == "$MOCK_OWS_FAIL"* ]]; then
+  echo "mock: simulated failure for '${CMD}'" >&2
+  exit 1
+fi
+
+# Dispatch on command
+case "${1:-}" in
+  --version)
+    echo "$MOCK_VERSION"
+    ;;
+  wallet)
+    case "${2:-}" in
+      create)
+        echo "Wallet created: ${MOCK_WALLET_ID}"
+        echo "Name:           mock-wallet"
+        echo ""
+        echo "  eip155:1 → ${MOCK_ADDRESS}"
+        echo "    Path: m/44'/60'/0'/0/0"
+        echo "  solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp → 7KzMock..."
+        echo "    Path: m/44'/501'/0'/0'"
+        ;;
+      info)
+        echo "Wallet: ${MOCK_WALLET_ID}"
+        echo "  eip155:1 → ${MOCK_ADDRESS}"
+        echo "    Path: m/44'/60'/0'/0/0"
+        ;;
+      list)
+        if [[ -n "${MOCK_OWS_WALLETS:-}" ]]; then
+          for w in $MOCK_OWS_WALLETS; do
+            echo "ID:      ${MOCK_WALLET_ID}"
+            echo "Name:    ${w}"
+            echo "Secured: (encrypted)"
+            echo "  eip155:1 (ethereum) → ${MOCK_ADDRESS}"
+            echo ""
+          done
+        else
+          echo "No wallets found."
+        fi
+        ;;
+      delete)
+        echo "Deleted wallet"
+        ;;
+      *)
+        echo "mock: unknown wallet command '${2:-}'" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+  policy)
+    case "${2:-}" in
+      create)
+        echo "Policy created"
+        ;;
+      show)
+        # Check if policy exists in mock
+        echo '{"id": "agent-chain-only", "name": "Agent chain restriction"}'
+        ;;
+      list)
+        echo "agent-chain-only"
+        ;;
+      delete)
+        echo "Policy deleted"
+        ;;
+      *)
+        echo "mock: unknown policy command '${2:-}'" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+  key)
+    case "${2:-}" in
+      create)
+        echo "API key created: ${MOCK_TOKEN}"
+        ;;
+      list)
+        if [[ -n "${MOCK_OWS_KEYS:-}" ]]; then
+          echo "$MOCK_OWS_KEYS"
+        else
+          echo "(no keys)"
+        fi
+        ;;
+      revoke)
+        echo "Key revoked"
+        ;;
+      *)
+        echo "mock: unknown key command '${2:-}'" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+  sign)
+    echo "mock: signing not implemented in mock" >&2
+    exit 1
+    ;;
+  *)
+    echo "mock: unknown command '${1:-}'" >&2
+    exit 1
+    ;;
+esac

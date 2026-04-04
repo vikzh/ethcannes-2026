@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Mock uname for platform detection tests
+# Returns MOCK_UNAME_OUTPUT (default: Darwin)
+
+case "${1:-}" in
+  -s) echo "${MOCK_UNAME_OUTPUT:-Darwin}" ;;
+  *)  echo "${MOCK_UNAME_OUTPUT:-Darwin}" ;;
+esac

@@ -1,0 +1,13 @@
+{
+  "id": "{{POLICY_ID}}",
+  "name": "Agent chain restriction",
+  "version": 1,
+  "created_at": "{{CREATED_AT}}",
+  "rules": [
+    {
+      "type": "allowed_chains",
+      "chain_ids": {{CHAIN_IDS}}
+    }
+  ],
+  "action": "deny"
+}
