@@ -87,7 +87,11 @@ export async function createWalletSepolia(): Promise<CreateWalletResult> {
   const salt = resolveSalt(process.env.WALLET_SALT);
 
   const factory = await ethers.getContractAt("AbstractAccountFactory", factoryAddress, owner);
-  const predicted = await factory.predictAccountAddress(salt, policyHookAddress);
+  const predicted = await factory.predictAccountAddress(
+    salt,
+    policyHookAddress,
+    installWhitelist ? whitelistModuleAddress : ethers.ZeroAddress
+  );
   const existingCode = await ethers.provider.getCode(predicted);
   if (existingCode !== "0x") {
     throw new Error(`Predicted account already deployed at ${predicted}. Use a different WALLET_SALT.`);
@@ -126,6 +130,7 @@ export async function createWalletSepolia(): Promise<CreateWalletResult> {
   const tx = await factory.deployAccount(
     salt,
     policyHookAddress,
+    installWhitelist ? whitelistModuleAddress : ethers.ZeroAddress,
     modules,
     agentAddress,
     installAgentValidator ? agentSessionValidatorAddress : ethers.ZeroAddress,

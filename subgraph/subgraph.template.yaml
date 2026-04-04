@@ -1,4 +1,5 @@
 specVersion: 1.0.0
+# buildTag: __BUILD_TAG__
 schema:
   file: ./schema.graphql
 

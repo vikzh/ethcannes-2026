@@ -35,23 +35,32 @@ function main() {
   const whitelistModule = mustGetContract(deployments, "WhitelistRequestModule");
   const policyHook = getContractWithFallback(deployments, "PolicyHookRuleSpend", "PolicyHook");
   const agentSessionValidator = mustGetContract(deployments, "AgentSessionValidator");
+  const buildTag = process.env.SUBGRAPH_BUILD_TAG?.trim() || `local-${Date.now()}`;
+  const offsetRaw = process.env.SUBGRAPH_START_BLOCK_OFFSET?.trim();
+  const offset = offsetRaw ? Number.parseInt(offsetRaw, 10) : 200;
+  const safeOffset = Number.isFinite(offset) && offset > 0 ? offset : 0;
+  const startBlock = (n) => Math.max(0, Number(n) - safeOffset);
 
   const template = fs.readFileSync(templatePath, "utf8");
   const result = template
     .replace(/__FACTORY_ADDRESS__/g, factory.address)
-    .replace(/__FACTORY_START_BLOCK__/g, String(factory.deploymentBlock))
+    .replace(/__FACTORY_START_BLOCK__/g, String(startBlock(factory.deploymentBlock)))
     .replace(/__WHITELIST_MODULE_ADDRESS__/g, whitelistModule.address)
-    .replace(/__WHITELIST_MODULE_START_BLOCK__/g, String(whitelistModule.deploymentBlock))
+    .replace(
+      /__WHITELIST_MODULE_START_BLOCK__/g,
+      String(startBlock(whitelistModule.deploymentBlock))
+    )
     .replace(/__POLICY_HOOK_ADDRESS__/g, policyHook.address)
-    .replace(/__POLICY_HOOK_START_BLOCK__/g, String(policyHook.deploymentBlock))
+    .replace(/__POLICY_HOOK_START_BLOCK__/g, String(startBlock(policyHook.deploymentBlock)))
     .replace(/__AGENT_SESSION_VALIDATOR_ADDRESS__/g, agentSessionValidator.address)
     .replace(
       /__AGENT_SESSION_VALIDATOR_START_BLOCK__/g,
-      String(agentSessionValidator.deploymentBlock)
-    );
+      String(startBlock(agentSessionValidator.deploymentBlock))
+    )
+    .replace(/__BUILD_TAG__/g, buildTag);
 
   fs.writeFileSync(outputPath, result);
-  console.log(`Generated ${outputPath}`);
+  console.log(`Generated ${outputPath} (start block offset: ${safeOffset}, build tag: ${buildTag})`);
 }
 
 main();

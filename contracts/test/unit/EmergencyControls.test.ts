@@ -18,7 +18,8 @@ describe("EmergencyControls", () => {
     const emergency = await (await ethers.getContractFactory("EmergencyControls")).deploy();
     const account = await (await ethers.getContractFactory("IsolatedAccount")).deploy(
       owner.address,
-      await hook.getAddress()
+      await hook.getAddress(),
+      ethers.ZeroAddress
     );
 
     await account.installModule(await hook.getAddress(), "0x");
@@ -46,7 +47,8 @@ describe("EmergencyControls", () => {
     const validator = await (await ethers.getContractFactory("AgentSessionValidator")).deploy();
     const account = await (await ethers.getContractFactory("IsolatedAccount")).deploy(
       owner.address,
-      await hook.getAddress()
+      await hook.getAddress(),
+      ethers.ZeroAddress
     );
 
     await account.installModule(await hook.getAddress(), "0x");

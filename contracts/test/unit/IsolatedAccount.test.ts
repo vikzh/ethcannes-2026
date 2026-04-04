@@ -50,6 +50,7 @@ describe("IsolatedAccount", () => {
     const [owner] = await ethers.getSigners();
     const account = await (await ethers.getContractFactory("IsolatedAccount")).deploy(
       owner.address,
+      ethers.ZeroAddress,
       ethers.ZeroAddress
     );
     const counter = await (await ethers.getContractFactory("MockCounter")).deploy();
@@ -76,6 +77,7 @@ describe("IsolatedAccount", () => {
     const [owner] = await ethers.getSigners();
     const account = await (await ethers.getContractFactory("IsolatedAccount")).deploy(
       owner.address,
+      ethers.ZeroAddress,
       ethers.ZeroAddress
     );
     const counter = await (await ethers.getContractFactory("MockCounter")).deploy();
@@ -107,6 +109,7 @@ describe("IsolatedAccount", () => {
     const [owner] = await ethers.getSigners();
     const account = await (await ethers.getContractFactory("IsolatedAccount")).deploy(
       owner.address,
+      ethers.ZeroAddress,
       ethers.ZeroAddress
     );
     const counter = await (await ethers.getContractFactory("MockCounter")).deploy();
@@ -142,6 +145,7 @@ describe("IsolatedAccount", () => {
     const [owner, attacker] = await ethers.getSigners();
     const account = await (await ethers.getContractFactory("IsolatedAccount")).deploy(
       owner.address,
+      ethers.ZeroAddress,
       ethers.ZeroAddress
     );
     const counter = await (await ethers.getContractFactory("MockCounter")).deploy();
@@ -172,6 +176,7 @@ describe("IsolatedAccount", () => {
     const [owner] = await ethers.getSigners();
     const account = await (await ethers.getContractFactory("IsolatedAccount")).deploy(
       owner.address,
+      ethers.ZeroAddress,
       ethers.ZeroAddress
     );
     const counter = await (await ethers.getContractFactory("MockCounter")).deploy();
@@ -204,6 +209,7 @@ describe("IsolatedAccount", () => {
     const [owner] = await ethers.getSigners();
     const account = await (await ethers.getContractFactory("IsolatedAccount")).deploy(
       owner.address,
+      ethers.ZeroAddress,
       ethers.ZeroAddress
     );
     const counter = await (await ethers.getContractFactory("MockCounter")).deploy();
@@ -232,7 +238,8 @@ describe("IsolatedAccount", () => {
     const validator = await (await ethers.getContractFactory("AgentSessionValidator")).deploy();
     const account = await (await ethers.getContractFactory("IsolatedAccount")).deploy(
       owner.address,
-      await hook.getAddress()
+      await hook.getAddress(),
+      ethers.ZeroAddress
     );
 
     await account.installModule(await hook.getAddress(), "0x");
@@ -286,5 +293,94 @@ describe("IsolatedAccount", () => {
     await expect(
       account.executeAuthorized(buildMode(CALLTYPE_SINGLE), executionCalldata, 1n, 0n, sig2)
     ).to.be.revertedWithCustomError(account, "AgentSessionInvalid");
+  });
+
+  it("allows active agent to execute via proxy entrypoint", async () => {
+    const [owner, agent, targetSigner] = await ethers.getSigners();
+    const hook = await (await ethers.getContractFactory("PolicyHook")).deploy();
+    const validator = await (await ethers.getContractFactory("AgentSessionValidator")).deploy();
+    const account = await (await ethers.getContractFactory("IsolatedAccount")).deploy(
+      owner.address,
+      await hook.getAddress(),
+      ethers.ZeroAddress
+    );
+
+    await account.installModule(await hook.getAddress(), "0x");
+    await account.installModule(
+      await validator.getAddress(),
+      ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address", "uint48", "uint48"],
+        [agent.address, 0, 0]
+      )
+    );
+    await account.setAgentSessionValidator(await validator.getAddress());
+
+    const selector = "0xdeadbeef";
+    const executionCalldata = encodeSingle(targetSigner.address, 0n, selector + "00".repeat(4));
+    await expect(
+      account.connect(agent).executeAsAgent(buildMode(CALLTYPE_SINGLE), executionCalldata)
+    ).to.be.revertedWithCustomError(account, "PolicyPreCheckFailed");
+
+    const whitelistCall = hook.interface.encodeFunctionData("addWhitelistEntry", [
+      targetSigner.address,
+      selector,
+    ]);
+    await account.execute(
+      buildMode(CALLTYPE_SINGLE),
+      encodeSingle(await hook.getAddress(), 0n, whitelistCall)
+    );
+
+    await expect(
+      account.connect(agent).executeAsAgent(buildMode(CALLTYPE_SINGLE), executionCalldata)
+    ).to.not.be.reverted;
+
+    const revokeCall = validator.interface.encodeFunctionData("revokeSession");
+    await account.execute(
+      buildMode(CALLTYPE_SINGLE),
+      encodeSingle(await validator.getAddress(), 0n, revokeCall)
+    );
+    await expect(
+      account.connect(agent).executeAsAgent(buildMode(CALLTYPE_SINGLE), executionCalldata)
+    ).to.be.revertedWithCustomError(account, "AgentSessionInvalid");
+  });
+
+  it("supports whitelist request/approve flow via account-native methods", async () => {
+    const [owner, agent, targetSigner] = await ethers.getSigners();
+    const hook = await (await ethers.getContractFactory("PolicyHook")).deploy();
+    const validator = await (await ethers.getContractFactory("AgentSessionValidator")).deploy();
+    const whitelistModule = await (await ethers.getContractFactory("WhitelistRequestModule")).deploy();
+    const account = await (await ethers.getContractFactory("IsolatedAccount")).deploy(
+      owner.address,
+      await hook.getAddress(),
+      await whitelistModule.getAddress()
+    );
+
+    await account.installModule(await hook.getAddress(), "0x");
+    await account.installModule(await whitelistModule.getAddress(), "0x");
+    await account.installModule(
+      await validator.getAddress(),
+      ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address", "uint48", "uint48"],
+        [agent.address, 0, 0]
+      )
+    );
+    await account.setAgentSessionValidator(await validator.getAddress());
+
+    const selector = "0xdeadbeef";
+    await expect(
+      account.connect(agent).requestWhitelistAdditionAsAgent(targetSigner.address, selector, "narrow")
+    )
+      .to.emit(whitelistModule, "WhitelistRequested")
+      .withArgs(await account.getAddress(), 0n, targetSigner.address, selector, "narrow");
+
+    await expect(
+      account.connect(agent).approveWhitelistRequestAsOwner(0n)
+    ).to.be.revertedWithCustomError(account, "Unauthorized");
+
+    await expect(account.approveWhitelistRequestAsOwner(0n))
+      .to.emit(whitelistModule, "WhitelistApproved")
+      .withArgs(await account.getAddress(), 0n, targetSigner.address, selector);
+
+    expect(await hook.isWhitelisted(await account.getAddress(), targetSigner.address, selector)).to.equal(true);
   });
 });

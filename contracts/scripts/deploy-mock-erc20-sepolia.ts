@@ -44,18 +44,19 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   const deployerAddress = await deployer.getAddress();
   const chainId = Number((await ethers.provider.getNetwork()).chainId);
+  let nextNonce = await ethers.provider.getTransactionCount(deployerAddress, "pending");
 
   const accountAddress = requireAccountAddress();
   const mintAmount = getMintAmount();
 
   const tokenFactory = await ethers.getContractFactory("MockERC20");
-  const token = await tokenFactory.deploy();
+  const token = await tokenFactory.deploy({ nonce: nextNonce++ });
   await token.waitForDeployment();
   const deployReceipt = await token.deploymentTransaction()?.wait();
   if (!deployReceipt) throw new Error("Missing deployment receipt for MockERC20");
   const tokenAddress = await token.getAddress();
 
-  const mintTx = await token.mint(accountAddress, mintAmount);
+  const mintTx = await token.mint(accountAddress, mintAmount, { nonce: nextNonce++ });
   const mintReceipt = await mintTx.wait();
   if (!mintReceipt) throw new Error("Missing mint receipt");
 

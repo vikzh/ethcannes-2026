@@ -65,7 +65,8 @@ describe("WhitelistFlowIsolated (integration)", () => {
     ).deploy();
     const account: IsolatedAccount = await (await ethers.getContractFactory("IsolatedAccount")).deploy(
       owner.address,
-      await hook.getAddress()
+      await hook.getAddress(),
+      ethers.ZeroAddress
     );
 
     await account.installModule(await hook.getAddress(), "0x");

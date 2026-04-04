@@ -6,6 +6,7 @@ import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import { IERC7579Module } from "../interfaces/IERC7579Module.sol";
 import { IPolicyHook } from "../interfaces/IPolicyHook.sol";
 import { IAgentSessionValidator } from "../interfaces/IAgentSessionValidator.sol";
+import { IWhitelistRequestModule } from "../interfaces/IWhitelistRequestModule.sol";
 import { Execution } from "../types/ExecutionTypes.sol";
 
 /// @notice Isolated (non-4337) modular account with signed execution.
@@ -18,6 +19,7 @@ contract IsolatedAccount is EIP712 {
     address public owner;
     address public policyHook;
     address public agentSessionValidator;
+    address public whitelistModule;
     uint256 public nonce;
 
     mapping(address => bool) public isModuleInstalled;
@@ -30,6 +32,7 @@ contract IsolatedAccount is EIP712 {
     error SignatureExpired(uint256 deadline);
     error InvalidSignature();
     error AgentSessionInvalid(address signer);
+    error WhitelistModuleNotConfigured();
     error UnsupportedMode(bytes1 callType);
     error InvalidExecutionCalldata();
     error PolicyPreCheckFailed(bytes revertData);
@@ -40,6 +43,7 @@ contract IsolatedAccount is EIP712 {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event PolicyHookSet(address indexed policyHook);
     event AgentSessionValidatorSet(address indexed validator);
+    event WhitelistModuleSet(address indexed module);
     event ModuleInstalled(address indexed module, bool isExecutor);
     event ModuleUninstalled(address indexed module);
     event ExecutionEnvelope(
@@ -72,12 +76,14 @@ contract IsolatedAccount is EIP712 {
         _;
     }
 
-    constructor(address owner_, address policyHook_) EIP712("IsolatedAccount", "1") {
+    constructor(address owner_, address policyHook_, address whitelistModule_) EIP712("IsolatedAccount", "1") {
         if (owner_ == address(0)) revert ZeroAddress();
         owner = owner_;
         policyHook = policyHook_;
+        whitelistModule = whitelistModule_;
         emit OwnershipTransferred(address(0), owner_);
         emit PolicyHookSet(policyHook_);
+        emit WhitelistModuleSet(whitelistModule_);
     }
 
     function transferOwnership(address newOwner) external onlyOwner {
@@ -95,6 +101,11 @@ contract IsolatedAccount is EIP712 {
     function setAgentSessionValidator(address validator) external onlyOwner {
         agentSessionValidator = validator;
         emit AgentSessionValidatorSet(validator);
+    }
+
+    function setWhitelistModule(address module) external onlyOwner {
+        whitelistModule = module;
+        emit WhitelistModuleSet(module);
     }
 
     function installModule(address module, bytes calldata initData) external onlyOwner {
@@ -131,6 +142,68 @@ contract IsolatedAccount is EIP712 {
             false
         );
         _execute(mode, executionCalldata, type(uint256).max, executionHash);
+    }
+
+    /// @notice Agent-only proxy entrypoint for direct account execution.
+    /// @dev Requires an active session in `agentSessionValidator` and still runs policy pre/post checks.
+    function executeAsAgent(bytes32 mode, bytes calldata executionCalldata)
+        external
+        payable
+        returns (bytes[] memory results)
+    {
+        if (!_isActiveAgentSigner(msg.sender)) revert AgentSessionInvalid(msg.sender);
+
+        bytes32 executionHash = keccak256(executionCalldata);
+        emit ExecutionEnvelope(
+            address(this),
+            msg.sender,
+            msg.sender,
+            type(uint256).max,
+            mode,
+            0,
+            executionHash,
+            _callCount(mode, executionCalldata),
+            true
+        );
+
+        bytes memory hookMsgData = abi.encodeWithSelector(this.execute.selector, mode, executionCalldata);
+        bytes memory hookData = _runPreCheck(msg.sender, msg.value, hookMsgData);
+        results = _execute(mode, executionCalldata, type(uint256).max, executionHash);
+        _runPostCheck(hookData);
+        return results;
+    }
+
+    /// @notice Agent-only account-native wrapper for whitelist request submission.
+    function requestWhitelistAdditionAsAgent(address target, bytes4 selector, string calldata metadata)
+        external
+        returns (uint256 requestId)
+    {
+        if (!_isActiveAgentSigner(msg.sender)) revert AgentSessionInvalid(msg.sender);
+        address module = whitelistModule;
+        if (module == address(0)) revert WhitelistModuleNotConfigured();
+        return IWhitelistRequestModule(module).requestWhitelistAddition(target, selector, metadata);
+    }
+
+    /// @notice Agent-only account-native wrapper for cancelling pending whitelist request.
+    function cancelWhitelistRequestAsAgent(uint256 requestId) external {
+        if (!_isActiveAgentSigner(msg.sender)) revert AgentSessionInvalid(msg.sender);
+        address module = whitelistModule;
+        if (module == address(0)) revert WhitelistModuleNotConfigured();
+        IWhitelistRequestModule(module).cancelRequest(requestId);
+    }
+
+    /// @notice Owner-only account-native wrapper for approving whitelist request.
+    function approveWhitelistRequestAsOwner(uint256 requestId) external onlyOwner {
+        address module = whitelistModule;
+        if (module == address(0)) revert WhitelistModuleNotConfigured();
+        IWhitelistRequestModule(module).approveRequest(requestId, policyHook);
+    }
+
+    /// @notice Owner-only account-native wrapper for rejecting whitelist request.
+    function rejectWhitelistRequestAsOwner(uint256 requestId) external onlyOwner {
+        address module = whitelistModule;
+        if (module == address(0)) revert WhitelistModuleNotConfigured();
+        IWhitelistRequestModule(module).rejectRequest(requestId);
     }
 
     function executeAuthorized(

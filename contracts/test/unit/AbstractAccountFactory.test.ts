@@ -10,17 +10,19 @@ describe("AbstractAccountFactory", () => {
   let factory: any;
   let hook: any;
   let agentValidator: any;
+  let whitelistModule: any;
 
   beforeEach(async () => {
     factory = await (await ethers.getContractFactory("AbstractAccountFactory")).deploy();
     hook = await (await ethers.getContractFactory("PolicyHook")).deploy();
     agentValidator = await (await ethers.getContractFactory("AgentSessionValidator")).deploy();
+    whitelistModule = await (await ethers.getContractFactory("WhitelistRequestModule")).deploy();
   });
 
   it("deploys a deterministic account and installs modules", async () => {
     const [owner, agent] = await ethers.getSigners();
     const salt = ethers.keccak256(ethers.toUtf8Bytes("aa-account-1"));
-    const predicted = await factory.predictAccountAddress(salt, hook.target as string);
+    const predicted = await factory.predictAccountAddress(salt, hook.target as string, whitelistModule.target as string);
 
     const modules = [
       {
@@ -30,7 +32,7 @@ describe("AbstractAccountFactory", () => {
     ];
 
     await expect(
-      factory.deployAccount(salt, hook.target as string, modules, agent.address, ethers.ZeroAddress)
+      factory.deployAccount(salt, hook.target as string, whitelistModule.target as string, modules, agent.address, ethers.ZeroAddress)
     )
       .to.emit(factory, "AccountDeployed")
       .withArgs(
@@ -43,6 +45,7 @@ describe("AbstractAccountFactory", () => {
     const account = await ethers.getContractAt("IsolatedAccount", predicted);
     expect(await account.owner()).to.equal(owner.address);
     expect(await account.policyHook()).to.equal(hook.target as string);
+    expect(await account.whitelistModule()).to.equal(whitelistModule.target as string);
     expect(await hook.isInitialized(predicted)).to.equal(true);
     expect(await factory.getWalletByAgent(agent.address)).to.equal(predicted);
     expect(await factory.getWalletByUser(owner.address)).to.equal(predicted);
@@ -59,6 +62,7 @@ describe("AbstractAccountFactory", () => {
       factory.deployAccount(
         salt,
         ethers.ZeroAddress,
+        whitelistModule.target as string,
         [{ module: ethers.ZeroAddress, initData: "0x" }],
         agent.address,
         ethers.ZeroAddress
@@ -72,11 +76,11 @@ describe("AbstractAccountFactory", () => {
     const salt2 = ethers.keccak256(ethers.toUtf8Bytes("aa-account-4"));
     const modules = [{ module: hook.target as string, initData: "0x" }];
 
-    await factory.deployAccount(salt1, hook.target as string, modules, agent.address, ethers.ZeroAddress);
+    await factory.deployAccount(salt1, hook.target as string, whitelistModule.target as string, modules, agent.address, ethers.ZeroAddress);
     await expect(
       factory
         .connect(otherOwner)
-        .deployAccount(salt2, hook.target as string, modules, agent.address, ethers.ZeroAddress)
+        .deployAccount(salt2, hook.target as string, whitelistModule.target as string, modules, agent.address, ethers.ZeroAddress)
     )
       .to.be.revertedWithCustomError(factory, "AgentAlreadyHasWallet");
   });
@@ -86,7 +90,7 @@ describe("AbstractAccountFactory", () => {
     const modules = [{ module: hook.target as string, initData: "0x" }];
 
     await expect(
-      factory.deployAccount(salt, hook.target as string, modules, ethers.ZeroAddress, ethers.ZeroAddress)
+      factory.deployAccount(salt, hook.target as string, whitelistModule.target as string, modules, ethers.ZeroAddress, ethers.ZeroAddress)
     )
       .to.be.revertedWithCustomError(factory, "ZeroAgentAddress");
   });
@@ -96,12 +100,12 @@ describe("AbstractAccountFactory", () => {
     const salt1 = ethers.keccak256(ethers.toUtf8Bytes("aa-account-6"));
     const salt2 = ethers.keccak256(ethers.toUtf8Bytes("aa-account-7"));
     const modules = [{ module: hook.target as string, initData: "0x" }];
-    const predicted1 = await factory.predictAccountAddress(salt1, hook.target as string);
-    const predicted2 = await factory.predictAccountAddress(salt2, hook.target as string);
+    const predicted1 = await factory.predictAccountAddress(salt1, hook.target as string, whitelistModule.target as string);
+    const predicted2 = await factory.predictAccountAddress(salt2, hook.target as string, whitelistModule.target as string);
 
-    await factory.deployAccount(salt1, hook.target as string, modules, agent.address, ethers.ZeroAddress);
+    await factory.deployAccount(salt1, hook.target as string, whitelistModule.target as string, modules, agent.address, ethers.ZeroAddress);
     await expect(
-      factory.deployAccount(salt2, hook.target as string, modules, otherAgent.address, ethers.ZeroAddress)
+      factory.deployAccount(salt2, hook.target as string, whitelistModule.target as string, modules, otherAgent.address, ethers.ZeroAddress)
     )
       .to.not.be.reverted;
 
@@ -120,9 +124,7 @@ describe("AbstractAccountFactory", () => {
     const before = await ethers.provider.getBalance(agent.address);
 
     await factory.deployAccount(
-      salt,
-      hook.target as string,
-      modules,
+      salt, hook.target as string, whitelistModule.target as string, modules,
       agent.address,
       ethers.ZeroAddress,
       { value: funding }
@@ -147,20 +149,16 @@ describe("AbstractAccountFactory", () => {
 
     const salt1 = ethers.keccak256(ethers.toUtf8Bytes("aa-account-13"));
     const salt2 = ethers.keccak256(ethers.toUtf8Bytes("aa-account-14"));
-    const predicted1 = await factory.predictAccountAddress(salt1, hook.target as string);
-    const predicted2 = await factory.predictAccountAddress(salt2, hook.target as string);
+    const predicted1 = await factory.predictAccountAddress(salt1, hook.target as string, whitelistModule.target as string);
+    const predicted2 = await factory.predictAccountAddress(salt2, hook.target as string, whitelistModule.target as string);
 
     await factory.deployAccount(
-      salt1,
-      hook.target as string,
-      mkModules(agent1.address),
+      salt1, hook.target as string, whitelistModule.target as string, mkModules(agent1.address),
       agent1.address,
       agentValidator.target as string
     );
     await factory.deployAccount(
-      salt2,
-      hook.target as string,
-      mkModules(agent2.address),
+      salt2, hook.target as string, whitelistModule.target as string, mkModules(agent2.address),
       agent2.address,
       agentValidator.target as string
     );
@@ -184,20 +182,16 @@ describe("AbstractAccountFactory", () => {
 
     const salt1 = ethers.keccak256(ethers.toUtf8Bytes("aa-account-15"));
     const salt2 = ethers.keccak256(ethers.toUtf8Bytes("aa-account-16"));
-    const predicted1 = await factory.predictAccountAddress(salt1, hook.target as string);
-    const predicted2 = await factory.predictAccountAddress(salt2, hook.target as string);
+    const predicted1 = await factory.predictAccountAddress(salt1, hook.target as string, whitelistModule.target as string);
+    const predicted2 = await factory.predictAccountAddress(salt2, hook.target as string, whitelistModule.target as string);
 
     await factory.deployAccount(
-      salt1,
-      hook.target as string,
-      mkModules(agent1.address),
+      salt1, hook.target as string, whitelistModule.target as string, mkModules(agent1.address),
       agent1.address,
       agentValidator.target as string
     );
     await factory.deployAccount(
-      salt2,
-      hook.target as string,
-      mkModules(agent2.address),
+      salt2, hook.target as string, whitelistModule.target as string, mkModules(agent2.address),
       agent2.address,
       agentValidator.target as string
     );
@@ -212,7 +206,7 @@ describe("AbstractAccountFactory", () => {
   it("sets agent session validator during deploy (no follow-up tx needed)", async () => {
     const [, agent] = await ethers.getSigners();
     const salt = ethers.keccak256(ethers.toUtf8Bytes("aa-account-9"));
-    const predicted = await factory.predictAccountAddress(salt, hook.target as string);
+    const predicted = await factory.predictAccountAddress(salt, hook.target as string, whitelistModule.target as string);
     const initData = ethers.AbiCoder.defaultAbiCoder().encode(
       ["address", "uint48", "uint48"],
       [agent.address, 0n, 0n]
@@ -223,9 +217,7 @@ describe("AbstractAccountFactory", () => {
     ];
 
     await factory.deployAccount(
-      salt,
-      hook.target as string,
-      modules,
+      salt, hook.target as string, whitelistModule.target as string, modules,
       agent.address,
       agentValidator.target as string
     );
@@ -237,7 +229,7 @@ describe("AbstractAccountFactory", () => {
   it("syncs factory agent mapping after session rotation", async () => {
     const [owner, agent1, agent2] = await ethers.getSigners();
     const salt = ethers.keccak256(ethers.toUtf8Bytes("aa-account-10"));
-    const predicted = await factory.predictAccountAddress(salt, hook.target as string);
+    const predicted = await factory.predictAccountAddress(salt, hook.target as string, whitelistModule.target as string);
     const initData = ethers.AbiCoder.defaultAbiCoder().encode(
       ["address", "uint48", "uint48"],
       [agent1.address, 0n, 0n]
@@ -248,9 +240,7 @@ describe("AbstractAccountFactory", () => {
     ];
 
     await factory.deployAccount(
-      salt,
-      hook.target as string,
-      modules,
+      salt, hook.target as string, whitelistModule.target as string, modules,
       agent1.address,
       agentValidator.target as string
     );
@@ -297,19 +287,15 @@ describe("AbstractAccountFactory", () => {
 
     const saltA = ethers.keccak256(ethers.toUtf8Bytes("aa-account-11"));
     const saltB = ethers.keccak256(ethers.toUtf8Bytes("aa-account-12"));
-    const predictedA = await factory.predictAccountAddress(saltA, hook.target as string);
+    const predictedA = await factory.predictAccountAddress(saltA, hook.target as string, whitelistModule.target as string);
 
     await factory.deployAccount(
-      saltA,
-      hook.target as string,
-      mkModules(agent1.address),
+      saltA, hook.target as string, whitelistModule.target as string, mkModules(agent1.address),
       agent1.address,
       agentValidator.target as string
     );
     await factory.deployAccount(
-      saltB,
-      hook.target as string,
-      mkModules(agent2.address),
+      saltB, hook.target as string, whitelistModule.target as string, mkModules(agent2.address),
       agent2.address,
       agentValidator.target as string
     );

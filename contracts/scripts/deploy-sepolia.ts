@@ -18,12 +18,16 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   const deployerAddress = await deployer.getAddress();
   const chainId = Number((await ethers.provider.getNetwork()).chainId);
+  let nextNonce = await ethers.provider.getTransactionCount(deployerAddress, "pending");
 
   console.log(`Deploying with ${deployerAddress} on chain ${chainId} (${network.name})`);
+  console.log(`Starting nonce (pending): ${nextNonce}`);
 
   const deployContract = async (name: string) => {
     const factory = await ethers.getContractFactory(name);
-    const contract = await factory.deploy();
+    const nonce = nextNonce++;
+    console.log(`Deploying ${name} with nonce ${nonce}...`);
+    const contract = await factory.deploy({ nonce });
     await contract.waitForDeployment();
     const receipt = await contract.deploymentTransaction()?.wait();
     if (!receipt) {

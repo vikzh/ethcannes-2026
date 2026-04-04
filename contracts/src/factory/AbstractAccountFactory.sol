@@ -49,6 +49,7 @@ contract AbstractAccountFactory {
     function deployAccount(
         bytes32 salt,
         address policyHook,
+        address whitelistModule,
         ModuleInit[] calldata modules,
         address agent,
         address agentSessionValidator
@@ -60,7 +61,10 @@ contract AbstractAccountFactory {
         if (existing != address(0)) revert AgentAlreadyHasWallet(agent, existing);
 
         bytes memory bytecode =
-            abi.encodePacked(type(IsolatedAccount).creationCode, abi.encode(address(this), policyHook));
+            abi.encodePacked(
+                type(IsolatedAccount).creationCode,
+                abi.encode(address(this), policyHook, whitelistModule)
+            );
         address deployedAddress;
         assembly {
             deployedAddress := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
@@ -148,9 +152,16 @@ contract AbstractAccountFactory {
     }
 
     /// @notice Computes deterministic account address for given salt and policy hook.
-    function predictAccountAddress(bytes32 salt, address policyHook) external view returns (address predicted) {
+    function predictAccountAddress(bytes32 salt, address policyHook, address whitelistModule)
+        external
+        view
+        returns (address predicted)
+    {
         bytes32 codeHash = keccak256(
-            abi.encodePacked(type(IsolatedAccount).creationCode, abi.encode(address(this), policyHook))
+            abi.encodePacked(
+                type(IsolatedAccount).creationCode,
+                abi.encode(address(this), policyHook, whitelistModule)
+            )
         );
         bytes32 hash = keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, codeHash));
         predicted = address(uint160(uint256(hash)));
