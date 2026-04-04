@@ -31,7 +31,17 @@ import {
   SEPOLIA_TOKENS,
 } from "@/lib/contracts";
 
-type RuleType = "whitelist" | "narrow" | "ens" | "custom";
+type RuleType = "whitelist" | "narrow" | "ens" | "custom" | "swap";
+
+type SwapOperation = "approve" | "swap";
+
+const APPROVE_SELECTOR = "0x095ea7b3" as const;
+const SWAP_SELECTOR = "0x04e45aaf" as const;
+
+/** Uniswap V3 SwapRouter — used as the spender for approve rules */
+const SWAP_ROUTER_APPROVE_TARGET = "0xE592427A0AEce92De3Edee1F18E0157C05861564" as Address;
+/** Uniswap V3 SwapRouter02 on Sepolia — used as the target for swap rules */
+const SWAP_ROUTER_SWAP_TARGET = "0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E" as Address;
 
 /** Special value in the token dropdown meaning "enter address manually" */
 const CUSTOM_TOKEN = "__custom__" as const;
@@ -117,16 +127,30 @@ export function AddRuleModal({
   const [customSource, setCustomSource] = useState("");
   const [customDestination, setCustomDestination] = useState("");
   const [customSelector, setCustomSelector] = useState("0xa9059cbb");
+  const [swapOperation, setSwapOperation] = useState<SwapOperation>("approve");
+  const [selectedSwapToToken, setSelectedSwapToToken] = useState(
+    SEPOLIA_TOKENS[0].address as string,
+  );
+  const [customSwapToAddress, setCustomSwapToAddress] = useState("");
 
   const isCustom = selectedToken === CUSTOM_TOKEN;
   const knownToken = !isCustom
     ? SEPOLIA_TOKENS.find((t) => t.address === selectedToken)
     : undefined;
+  const isCustomSwapTo = selectedSwapToToken === CUSTOM_TOKEN;
+  const knownSwapToToken = !isCustomSwapTo
+    ? SEPOLIA_TOKENS.find((t) => t.address === selectedSwapToToken)
+    : undefined;
 
   const resolvedTokenAddress = isCustom ? customTokenAddress : selectedToken;
   const normalizedTokenAddress = normalizeAddress(resolvedTokenAddress);
+  const resolvedSwapToAddress = isCustomSwapTo
+    ? customSwapToAddress
+    : selectedSwapToToken;
+  const normalizedSwapToAddress = normalizeAddress(resolvedSwapToAddress);
   const normalizedDestination = normalizeAddress(allowedDestination);
   const isValidToken = normalizedTokenAddress !== undefined;
+  const isValidSwapToToken = normalizedSwapToAddress !== undefined;
   const isValidDestination = normalizedDestination !== undefined;
 
   // Fetch token metadata only for custom addresses
@@ -155,6 +179,7 @@ export function AddRuleModal({
 
   const decimals = knownToken?.decimals ?? fetchedDecimals ?? 18;
   const tokenSymbol = knownToken?.symbol ?? fetchedSymbol;
+  const swapToTokenSymbol = knownSwapToToken?.symbol;
 
   const {
     writeContract,
@@ -190,8 +215,12 @@ export function AddRuleModal({
       ? ensRule.trim().length > 0 && maxAmount.length > 0
       : ruleType === "custom"
         ? !!normalizedCustomSource &&
-            resolvedCustomSelector !== undefined &&
-            isValidOptionalMaxAmount18(maxAmount)
+          resolvedCustomSelector !== undefined &&
+          isValidOptionalMaxAmount18(maxAmount)
+        : ruleType === "swap"
+          ? isValidToken &&
+            maxAmount.length > 0 &&
+            (swapOperation === "approve" || isValidSwapToToken)
         : isValidToken &&
           (ruleType === "whitelist" || (isValidDestination && maxAmount.length > 0))) &&
     !isSigning &&
@@ -258,6 +287,66 @@ export function AddRuleModal({
         functionName: "addWhitelistEntry",
         args: [normalizedTokenAddress, TRANSFER_SELECTOR],
       });
+    } else if (ruleType === "swap") {
+      if (!normalizedTokenAddress) return;
+
+      const parsedAmount = parseUnits(maxAmount, decimals);
+      const period = PERIOD_OPTIONS[periodIndex].seconds;
+
+      if (swapOperation === "approve") {
+        // approve(address spender,uint256 amount): keep the token as the call target and pin the spender.
+        hookCalldata = encodeFunctionData({
+          abi: POLICY_HOOK_ABI,
+          functionName: "addEqRuleWithSpend",
+          args: [
+            normalizedTokenAddress,
+            APPROVE_SELECTOR,
+            [
+              {
+                paramIndex: 0,
+                expectedValue: addressToBytes32(SWAP_ROUTER_APPROVE_TARGET),
+              },
+            ],
+            {
+              spendParamIndex: 1,
+              maxPerPeriod: parsedAmount,
+              periodDuration: BigInt(period),
+            },
+          ],
+        });
+      } else {
+        if (!normalizedSwapToAddress) return;
+
+        // exactInputSingle(params) is a static tuple:
+        // tokenIn=0, tokenOut=1, fee=2, recipient=3, amountIn=4, amountOutMinimum=5, sqrtPriceLimitX96=6.
+        hookCalldata = encodeFunctionData({
+          abi: POLICY_HOOK_ABI,
+          functionName: "addEqRuleWithSpend",
+          args: [
+            SWAP_ROUTER_SWAP_TARGET,
+            SWAP_SELECTOR,
+            [
+              {
+                paramIndex: 0,
+                expectedValue: addressToBytes32(normalizedTokenAddress),
+              },
+              {
+                paramIndex: 1,
+                expectedValue: addressToBytes32(normalizedSwapToAddress),
+              },
+              {
+                paramIndex: 3,
+                expectedValue: addressToBytes32(accountAddress),
+              },
+            ],
+            {
+              spendParamIndex: 4,
+              maxPerPeriod: parsedAmount,
+              periodDuration: BigInt(period),
+            },
+          ],
+        });
+      }
     } else {
       if (!normalizedTokenAddress) return;
       if (!normalizedDestination) return;
@@ -303,7 +392,7 @@ export function AddRuleModal({
   const error = writeError || receiptError;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 pt-6 pb-6">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
@@ -311,7 +400,7 @@ export function AddRuleModal({
       />
 
       {/* Modal */}
-      <div className="relative z-10 w-full max-w-3xl rounded-3xl border border-zinc-200 bg-white p-8 shadow-2xl">
+      <div className="relative z-10 w-full max-w-[55.566rem] rounded-3xl border border-zinc-200 bg-white p-8 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold tracking-tight text-zinc-900">
@@ -331,7 +420,7 @@ export function AddRuleModal({
         </p>
 
         {/* Rule type toggle */}
-        <div className="mt-6 flex items-stretch gap-2">
+        <div className="mt-6 grid items-stretch gap-2 md:grid-cols-5">
           <button
             type="button"
             onClick={() => setRuleType("ens")}
@@ -386,6 +475,20 @@ export function AddRuleModal({
             <span className="font-medium">Custom rule</span>
             <span className="mt-1 block text-xs opacity-70">
               Specify all fields manually
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setRuleType("swap")}
+            className={`flex-1 rounded-xl border px-4 py-3 text-left text-sm transition-all flex flex-col justify-center ${
+              ruleType === "swap"
+                ? "border-zinc-900 bg-zinc-900 text-white"
+                : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
+            }`}
+          >
+            <span className="font-medium">Market swap</span>
+            <span className="mt-1 block text-xs opacity-70">
+              Approve or swap via Uniswap router
             </span>
           </button>
         </div>
@@ -456,6 +559,25 @@ export function AddRuleModal({
             </>
           )}
 
+          {ruleType === "swap" && (
+            <div>
+              <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Operation
+              </label>
+              <div className="relative mt-1.5">
+                <select
+                  value={swapOperation}
+                  onChange={(e) => setSwapOperation(e.target.value as SwapOperation)}
+                  className="w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 pr-10 text-sm text-zinc-900 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                >
+                  <option value="approve">Approve</option>
+                  <option value="swap">Swap</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+              </div>
+            </div>
+          )}
+
           {/* Token selector — hidden for ENS policy and custom rule */}
           {ruleType !== "ens" && ruleType !== "custom" && (
             <div>
@@ -501,6 +623,46 @@ export function AddRuleModal({
             </div>
           )}
 
+          {ruleType === "swap" && swapOperation === "swap" && (
+            <>
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  Swap to token
+                </label>
+                <div className="relative mt-1.5">
+                  <select
+                    value={selectedSwapToToken}
+                    onChange={(e) => setSelectedSwapToToken(e.target.value)}
+                    className="w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 pr-10 text-sm text-zinc-900 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                  >
+                    {SEPOLIA_TOKENS.map((t) => (
+                      <option key={t.address} value={t.address}>
+                        {t.name} ({t.symbol})
+                      </option>
+                    ))}
+                    <option value={CUSTOM_TOKEN}>Custom token...</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                </div>
+              </div>
+
+              {isCustomSwapTo && (
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
+                    Swap to token contract address
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="0x..."
+                    value={customSwapToAddress}
+                    onChange={(e) => setCustomSwapToAddress(e.target.value.trim())}
+                    className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                  />
+                </div>
+              )}
+            </>
+          )}
+
           {/* Narrow-only: Allowed destination */}
           {ruleType === "narrow" && (
             <div>
@@ -520,14 +682,23 @@ export function AddRuleModal({
           )}
 
           {/* Max amount & Period — shown for narrow and ens */}
-          {(ruleType === "narrow" || ruleType === "ens" || ruleType === "custom") && (
+          {(ruleType === "narrow" ||
+            ruleType === "ens" ||
+            ruleType === "custom" ||
+            ruleType === "swap") && (
             <>
               {/* Max amount */}
               <div>
                 <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
                   Max amount per period
                   {ruleType === "custom" ? " (optional)" : ""}
-                  {tokenSymbol ? ` (${tokenSymbol})` : ""}
+                  {ruleType === "swap" && swapOperation === "swap"
+                    ? tokenSymbol
+                      ? ` (${tokenSymbol} in)`
+                      : ""
+                    : ruleType !== "custom" && tokenSymbol
+                      ? ` (${tokenSymbol})`
+                      : ""}
                 </label>
                 <input
                   type="text"
@@ -540,6 +711,12 @@ export function AddRuleModal({
                   }}
                   className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
                 />
+                {ruleType === "swap" && swapOperation === "swap" && (
+                  <p className="mt-1.5 text-xs text-zinc-500">
+                    Applies to the input token amount
+                    {swapToTokenSymbol ? ` when swapping into ${swapToTokenSymbol}` : ""}.
+                  </p>
+                )}
               </div>
 
               {/* Period */}

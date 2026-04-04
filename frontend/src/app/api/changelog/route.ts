@@ -37,6 +37,8 @@ interface GraphResponse {
 function describeSelector(selector: string) {
   if (selector === "0x00000000") return "Native transfer";
   if (selector === "0xa9059cbb") return "ERC-20 transfer";
+  if (selector === "0x095ea7b3") return "ERC-20 approve";
+  if (selector === "0x04e45aaf") return "Market swap";
   return "Contract interaction";
 }
 
