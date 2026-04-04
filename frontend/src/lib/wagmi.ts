@@ -1,6 +1,6 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { createConfig, http } from "wagmi";
-import { mainnet, sepolia } from "wagmi/chains";
+import { sepolia } from "wagmi/chains";
 import { injected } from "wagmi/connectors";
 
 const walletConnectProjectId =
@@ -10,6 +10,9 @@ const walletConnectProjectId =
 const useWalletConnect =
   walletConnectProjectId.length > 0 &&
   walletConnectProjectId !== "00000000000000000000000000000000";
+
+const sepoliaRpcUrl =
+  process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL?.trim() || undefined;
 
 /**
  * Without a WalletConnect / Reown project ID we only register the injected
@@ -23,14 +26,16 @@ export const wagmiConfig = useWalletConnect
   ? getDefaultConfig({
       appName: "Wallet Console",
       projectId: walletConnectProjectId,
-      chains: [mainnet, sepolia],
+      chains: [sepolia],
+      transports: {
+        [sepolia.id]: http(sepoliaRpcUrl),
+      },
       ssr: true,
     })
   : createConfig({
-      chains: [mainnet, sepolia],
+      chains: [sepolia],
       transports: {
-        [mainnet.id]: http(),
-        [sepolia.id]: http(),
+        [sepolia.id]: http(sepoliaRpcUrl),
       },
       connectors: [injected({ shimDisconnect: true })],
       ssr: true,

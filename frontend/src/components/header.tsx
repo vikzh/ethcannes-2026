@@ -3,20 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { formatEther } from "viem";
-import { useAccount, useBalance } from "wagmi";
 
 function shortAddress(addr: string) {
   const a = addr.startsWith("0x") ? addr : `0x${addr}`;
   if (a.length < 12) return a;
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
-}
-
-function formatEthDisplay(value: bigint) {
-  const n = Number(formatEther(value));
-  if (n >= 1) return n.toFixed(4);
-  if (n >= 0.0001) return n.toFixed(6);
-  return n.toExponential(2);
 }
 
 function AddressAvatar({ address }: { address: string }) {
@@ -37,13 +28,6 @@ function AddressAvatar({ address }: { address: string }) {
 }
 
 export function Header() {
-  const { address, isConnected } = useAccount();
-  const { data: balance } = useBalance({ address });
-
-  const bal = balance?.value;
-  const balanceLabel =
-    isConnected && bal != null ? `${formatEthDisplay(bal)} ETH` : "";
-
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200 px-5">
       <Link href="/" className="flex items-center gap-2">
@@ -90,9 +74,6 @@ export function Header() {
                 <span className="truncate font-mono text-xs text-zinc-700">
                   {chain.name?.slice(0, 3)}:{shortAddress(account.address)}
                 </span>
-                {balanceLabel && (
-                  <span className="shrink-0 text-zinc-500">{balanceLabel}</span>
-                )}
                 <span
                   className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-blue-600 text-[10px] font-bold text-white"
                   title={chain.name}
