@@ -585,7 +585,7 @@ export function DashboardApp() {
             </main>
           ) : (
             <main className="flex-1 overflow-auto p-6">
-              <div className="mx-auto flex min-h-full max-w-5xl items-center justify-center">
+              <div className="mx-auto flex min-h-full w-full max-w-5xl items-start justify-center">
                 {activeNav === "rules" ? renderHomePanel() : null}
                 {activeNav === "changelog" ? renderChangelogPanel() : null}
               </div>
