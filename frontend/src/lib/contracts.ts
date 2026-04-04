@@ -252,7 +252,7 @@ export const SEPOLIA_TOKENS: KnownToken[] = [
   { name: "Chainlink Token",   symbol: "LINK",  address: "0x779877A7B0D9E8603169DdbD7836e478b4624789", decimals: 18 },
   { name: "Uniswap Token",     symbol: "UNI",   address: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984", decimals: 18 },
   { name: "Aave Token",        symbol: "AAVE",  address: "0x5bB220AfC6e2E008Cb2302A83536a019eD245Aa2", decimals: 18 },
-  { name: "Mock Token",        symbol: "MOCK",  address: "0xF29934Cc706e20DDA4ba265FDE0d69c2E35e3988", decimals: 18 },
+  { name: "Mock Token",        symbol: "MOCK",  address: "0xF29934Cc706E20ddA4Ba265FdE0d69c2e35E3988", decimals: 18 },
 ];
 
 // ---------------------------------------------------------------------------

@@ -13,7 +13,13 @@ import {
   useWaitForTransactionReceipt,
   useReadContract,
 } from "wagmi";
-import { encodeFunctionData, parseUnits, type Address } from "viem";
+import {
+  encodeFunctionData,
+  getAddress,
+  isAddress,
+  parseUnits,
+  type Address,
+} from "viem";
 import {
   ISOLATED_ACCOUNT_ABI,
   POLICY_HOOK_ABI,
@@ -45,6 +51,11 @@ const PERIOD_OPTIONS = [
   { label: "30 days", seconds: 2592000 },
 ];
 
+function normalizeAddress(value: string): Address | undefined {
+  if (!isAddress(value, { strict: false })) return undefined;
+  return getAddress(value);
+}
+
 export function AddRuleModal({
   accountAddress,
   policyHookAddress,
@@ -64,28 +75,30 @@ export function AddRuleModal({
     : undefined;
 
   const resolvedTokenAddress = isCustom ? customTokenAddress : selectedToken;
-  const isValidToken = /^0x[a-fA-F0-9]{40}$/.test(resolvedTokenAddress);
-  const isValidDestination = /^0x[a-fA-F0-9]{40}$/.test(allowedDestination);
+  const normalizedTokenAddress = normalizeAddress(resolvedTokenAddress);
+  const normalizedDestination = normalizeAddress(allowedDestination);
+  const isValidToken = normalizedTokenAddress !== undefined;
+  const isValidDestination = normalizedDestination !== undefined;
 
   // Fetch token metadata only for custom addresses
   const shouldFetchMeta = isCustom && isValidToken;
 
   const { data: fetchedDecimals } = useReadContract({
-    address: shouldFetchMeta ? (resolvedTokenAddress as Address) : undefined,
+    address: shouldFetchMeta ? normalizedTokenAddress : undefined,
     abi: ERC20_ABI,
     functionName: "decimals",
     query: { enabled: shouldFetchMeta },
   });
 
   const { data: fetchedSymbol } = useReadContract({
-    address: shouldFetchMeta ? (resolvedTokenAddress as Address) : undefined,
+    address: shouldFetchMeta ? normalizedTokenAddress : undefined,
     abi: ERC20_ABI,
     functionName: "symbol",
     query: { enabled: shouldFetchMeta },
   });
 
   const { data: fetchedName } = useReadContract({
-    address: shouldFetchMeta ? (resolvedTokenAddress as Address) : undefined,
+    address: shouldFetchMeta ? normalizedTokenAddress : undefined,
     abi: ERC20_ABI,
     functionName: "name",
     query: { enabled: shouldFetchMeta },
@@ -93,7 +106,6 @@ export function AddRuleModal({
 
   const decimals = knownToken?.decimals ?? fetchedDecimals ?? 18;
   const tokenSymbol = knownToken?.symbol ?? fetchedSymbol;
-  const tokenName = knownToken?.name ?? fetchedName;
 
   const {
     writeContract,
@@ -130,6 +142,8 @@ export function AddRuleModal({
   function handleSubmit() {
     resetWrite();
 
+    if (!normalizedTokenAddress) return;
+
     let hookCalldata: `0x${string}`;
 
     if (ruleType === "whitelist") {
@@ -137,9 +151,11 @@ export function AddRuleModal({
       hookCalldata = encodeFunctionData({
         abi: POLICY_HOOK_ABI,
         functionName: "addWhitelistEntry",
-        args: [resolvedTokenAddress as Address, TRANSFER_SELECTOR],
+        args: [normalizedTokenAddress, TRANSFER_SELECTOR],
       });
     } else {
+      if (!normalizedDestination) return;
+
       // addEqRuleWithSpend — narrow rule restricting destination
       const parsedAmount = parseUnits(maxAmount, decimals);
       const period = PERIOD_OPTIONS[periodIndex].seconds;
@@ -148,13 +164,13 @@ export function AddRuleModal({
         abi: POLICY_HOOK_ABI,
         functionName: "addEqRuleWithSpend",
         args: [
-          resolvedTokenAddress as Address,
+          normalizedTokenAddress,
           TRANSFER_SELECTOR,
           // conditions: param 0 (destination address) must equal allowedDestination
           [
             {
               paramIndex: 0,
-              expectedValue: addressToBytes32(allowedDestination as Address),
+              expectedValue: addressToBytes32(normalizedDestination),
             },
           ],
           // spend config: param 1 is the amount
