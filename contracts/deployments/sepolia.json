@@ -27,6 +27,10 @@
     "AbstractAccountFactory": {
       "address": "0xA9C2365255Bf82a747aa7eFC46F13f34A69B6728",
       "deploymentBlock": 10589035
+    },
+    "MockERC20": {
+      "address": "0x5B36653ef264AF6D212b6e4fD9f7fdCE04E4C50C",
+      "deploymentBlock": 10589055
     }
   }
 }

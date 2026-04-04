@@ -10,6 +10,17 @@ async function main() {
   const ctx = await getContext();
   const transferSelector = ctx.mockToken.interface.getFunction("transfer")!.selector;
   const requestSelector = ctx.whitelistModule.interface.getFunction("requestWhitelistAddition")!.selector;
+  const allowedDestination = process.env.REQUEST_ALLOWED_DESTINATION?.trim() || "";
+  const dailyLimit = process.env.REQUEST_DAILY_LIMIT?.trim() || "";
+  const metadata =
+    process.env.REQUEST_METADATA?.trim() ||
+    [
+      "erc20 transfer approval for testing",
+      allowedDestination ? `allowedDestination=${allowedDestination}` : "",
+      dailyLimit ? `dailyLimit=${dailyLimit}/day` : "",
+    ]
+      .filter(Boolean)
+      .join("; ");
 
   const isRequestWhitelisted = await ctx.policyHook.isWhitelisted(
     ctx.accountAddress,
@@ -33,7 +44,7 @@ async function main() {
   const requestCall = ctx.whitelistModule.interface.encodeFunctionData("requestWhitelistAddition", [
     ctx.mockTokenAddress,
     transferSelector,
-    "erc20 transfer approval for testing",
+    metadata,
   ]);
   const requestExec = encodeSingle(await ctx.whitelistModule.getAddress(), 0n, requestCall);
   const nonce = await ctx.account.nonce();
