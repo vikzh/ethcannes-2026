@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { serializeTransaction, parseGwei } from "viem";
 import { getPublicClient } from "../lib/rpc.js";
-import { AA_ACCOUNT, ACTIVE_CHAIN_ID, RPC_URL, explorerTxUrl } from "../lib/constants.js";
+import { ACTIVE_CHAIN_ID, RPC_URL, explorerTxUrl } from "../lib/constants.js";
 import { buildAATransaction } from "../lib/aa.js";
 
 async function buildAndBroadcast({
@@ -88,9 +88,8 @@ function chainName(chainId) {
   return names[chainId] || `eip155:${chainId}`;
 }
 
-export function registerTransactionTools(server, { owsExec, readApiKey, walletName, agentAddress }) {
+export function registerTransactionTools(server, { owsExec, readApiKey, walletName, agentAddress, aaAccount }) {
   const activeChainId = ACTIVE_CHAIN_ID;
-  const aaAccount = AA_ACCOUNT;
 
   server.tool(
     "send_transaction",

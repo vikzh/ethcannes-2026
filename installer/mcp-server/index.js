@@ -14,10 +14,16 @@ import { registerTokenTools } from "./tools/token.js";
 import { registerContractTools } from "./tools/contract.js";
 import { registerTransactionTools } from "./tools/transaction.js";
 import { registerAccountTools } from "./tools/account.js";
-import { PROTOCOLS, TOKENS, AA_ACCOUNT, ACTIVE_CHAIN_ID, explorerAddressUrl } from "./lib/constants.js";
+import { getPublicClient } from "./lib/rpc.js";
+import { PROTOCOLS, TOKENS, FACTORY_ADDRESS, ACTIVE_CHAIN_ID, explorerAddressUrl } from "./lib/constants.js";
 
 const WALLET_NAME = process.env.AGENT_WALLET_NAME || "agent-wallet";
 const KEY_FILE = join(homedir(), ".ows", `${WALLET_NAME}.key`);
+
+const FACTORY_ABI = [
+  { name: "getWalletByAgent", type: "function", stateMutability: "view",
+    inputs: [{ name: "agent", type: "address" }], outputs: [{ type: "address" }] },
+];
 
 async function readApiKey() {
   try {
@@ -56,11 +62,28 @@ async function resolveWalletAddress() {
   }
 }
 
-const agentAddress = await resolveWalletAddress();
+async function resolveAAAccount(agentAddr) {
+  if (!FACTORY_ADDRESS || agentAddr === "unknown" || agentAddr.includes("unknown")) return "";
+  try {
+    const client = getPublicClient();
+    const wallet = await client.readContract({
+      address: FACTORY_ADDRESS,
+      abi: FACTORY_ABI,
+      functionName: "getWalletByAgent",
+      args: [agentAddr],
+    });
+    const ZERO = "0x0000000000000000000000000000000000000000";
+    return wallet && wallet !== ZERO ? wallet : "";
+  } catch (err) {
+    console.error(`Failed to resolve AA account from factory: ${err.message}`);
+    return "";
+  }
+}
 
-// When AA is active, the IsolatedAccount holds funds and is the DeFi actor.
-// The agent EOA only signs and pays gas for the outer executeAuthorized tx.
-const effectiveAddress = AA_ACCOUNT || agentAddress;
+const agentAddress = await resolveWalletAddress();
+const aaAccount = await resolveAAAccount(agentAddress);
+
+const effectiveAddress = aaAccount || agentAddress;
 
 const chainLabel = ACTIVE_CHAIN_ID === 84532
   ? "Base Sepolia (testnet)"
@@ -68,13 +91,13 @@ const chainLabel = ACTIVE_CHAIN_ID === 84532
     ? "Sepolia (testnet)"
     : "Base (mainnet)";
 
-const aaInstructions = AA_ACCOUNT
+const aaInstructions = aaAccount
   ? [
     ``,
     `== AA Smart Account Protection ==`,
     ``,
     `Your account is protected by on-chain policies:`,
-    `  ${explorerAddressUrl(AA_ACCOUNT)}`,
+    `  ${explorerAddressUrl(aaAccount)}`,
     `  The PolicyHook enforces whitelists and spend limits before any call executes.`,
     `  Transactions are signed with EIP-712 and routed through the account contract.`,
     ``,
@@ -105,13 +128,13 @@ const server = new McpServer(
   },
   {
     instructions: [
-      AA_ACCOUNT
+      aaAccount
         ? `You have an abstract account (smart contract wallet) on-chain.`
         : `You have an on-chain agent wallet managed by OWS with DeFi capabilities.`,
       ``,
-      AA_ACCOUNT
+      aaAccount
         ? [
-          `YOUR ACCOUNT: ${AA_ACCOUNT}`,
+          `YOUR ACCOUNT: ${aaAccount}`,
           `  This is your main address. All funds live here. All balances, swaps,`,
           `  approvals, and DeFi positions belong to this address.`,
           `Gas wallet (EOA): ${agentAddress}`,
@@ -177,7 +200,7 @@ const server = new McpServer(
       `3. Retry the original transaction`,
       ``,
       `Security: All signing is performed through this MCP server via OWS.`,
-      AA_ACCOUNT
+      aaAccount
         ? `Transactions are enforced by on-chain AA policies (whitelists, spend limits) via IsolatedAccount.`
         : `Transactions are restricted by OWS policies.`,
     ].join("\n"),
@@ -232,14 +255,14 @@ server.tool(
 
 registerUniswapTools(server, effectiveAddress);
 registerAaveTools(server, effectiveAddress);
-registerBalanceTools(server, { effectiveAddress, agentAddress, aaEnabled: !!AA_ACCOUNT });
+registerBalanceTools(server, { effectiveAddress, agentAddress, aaEnabled: !!aaAccount });
 registerTokenTools(server, effectiveAddress);
 registerContractTools(server);
-registerTransactionTools(server, { owsExec, readApiKey, walletName: WALLET_NAME, agentAddress });
+registerTransactionTools(server, { owsExec, readApiKey, walletName: WALLET_NAME, agentAddress, aaAccount });
 
 // --- AA inspection tools ---
 
-registerAccountTools(server, { owsExec, readApiKey, walletName: WALLET_NAME, agentAddress });
+registerAccountTools(server, { owsExec, readApiKey, walletName: WALLET_NAME, agentAddress, aaAccount });
 
 // --- Legacy prompt (kept for backwards compat) ---
 

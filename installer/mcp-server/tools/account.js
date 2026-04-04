@@ -1,15 +1,18 @@
 import { z } from "zod";
-import { formatEther, formatUnits, encodeFunctionData, serializeTransaction, parseGwei } from "viem";
+import { formatEther, formatUnits, encodeFunctionData, serializeTransaction } from "viem";
 import { getPublicClient } from "../lib/rpc.js";
 import { ISOLATED_ACCOUNT_ABI } from "../lib/abi/isolated-account.js";
 import { POLICY_HOOK_ABI } from "../lib/abi/policy-hook.js";
 import { AGENT_SESSION_ABI } from "../lib/abi/agent-session.js";
 import { WHITELIST_REQUEST_ABI, REQUEST_STATUS } from "../lib/abi/whitelist-request.js";
-import { buildAATransaction } from "../lib/aa.js";
-import { AA_ACCOUNT, ACTIVE_CHAIN_ID, RPC_URL, explorerAddressUrl, explorerTxUrl } from "../lib/constants.js";
+import { ACTIVE_CHAIN_ID, RPC_URL, explorerAddressUrl, explorerTxUrl } from "../lib/constants.js";
 
-export function registerAccountTools(server, { owsExec, readApiKey, walletName, agentAddress } = {}) {
-  const accountAddress = AA_ACCOUNT;
+const WHITELIST_MODULE_ABI = [
+  { name: "whitelistModule", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+];
+
+export function registerAccountTools(server, { owsExec, readApiKey, walletName, agentAddress, aaAccount } = {}) {
+  const accountAddress = aaAccount;
   if (!accountAddress) return;
 
   server.tool(
@@ -205,54 +208,54 @@ export function registerAccountTools(server, { owsExec, readApiKey, walletName, 
     }
   );
 
-  // --- Whitelist request tools ---
+  // --- Whitelist request tools (agent-native path, no executeAuthorized needed) ---
 
-  const whitelistModuleAddr = process.env.WHITELIST_REQUEST_MODULE || "";
-  if (!whitelistModuleAddr || !owsExec) return;
+  if (!owsExec) return;
+
+  const ISOLATED_ACCOUNT_WHITELIST_ABI = [
+    {
+      name: "requestWhitelistAdditionAsAgent",
+      type: "function",
+      stateMutability: "nonpayable",
+      inputs: [
+        { name: "target", type: "address" },
+        { name: "selector", type: "bytes4" },
+        { name: "metadata", type: "string" },
+      ],
+      outputs: [{ name: "requestId", type: "uint256" }],
+    },
+    {
+      name: "cancelWhitelistRequestAsAgent",
+      type: "function",
+      stateMutability: "nonpayable",
+      inputs: [{ name: "requestId", type: "uint256" }],
+      outputs: [],
+    },
+  ];
 
   function chainName(id) {
     const names = { 8453: "base", 1: "ethereum", 42161: "arbitrum", 10: "optimism", 137: "polygon" };
     return names[id] || `eip155:${id}`;
   }
 
-  async function broadcastViaMCP(innerTo, innerData, innerValue = "0") {
+  async function broadcastAgentTx(to, data) {
     const client = getPublicClient();
     const apiKey = await readApiKey();
-
-    let outerTo = innerTo;
-    let outerData = innerData;
-    let outerValue = innerValue;
-    let aaNonce;
-
-    if (accountAddress) {
-      const aaResult = await buildAATransaction({
-        publicClient: client,
-        owsExec,
-        readApiKey,
-        walletName,
-        accountAddress,
-        chainId: ACTIVE_CHAIN_ID,
-        calls: [{ target: innerTo, value: innerValue, data: innerData }],
-      });
-      outerTo = aaResult.outerTo;
-      outerData = aaResult.outerData;
-      outerValue = aaResult.outerValue;
-      aaNonce = aaResult.accountNonce;
-    }
 
     const nonce = await client.getTransactionCount({ address: agentAddress, blockTag: "pending" });
     let gasEstimate;
     try {
-      gasEstimate = await client.estimateGas({ account: agentAddress, to: outerTo, data: outerData, value: BigInt(outerValue), nonce });
+      gasEstimate = await client.estimateGas({ account: agentAddress, to, data, value: 0n, nonce });
     } catch {
-      gasEstimate = 500_000n;
+      gasEstimate = 300_000n;
     }
     const gas = (gasEstimate * 130n) / 100n;
     const feeData = await client.estimateFeesPerGas();
 
     const unsignedTx = {
-      to: outerTo, data: outerData, value: BigInt(outerValue),
-      nonce, gas, maxFeePerGas: feeData.maxFeePerGas, maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
+      to, data, value: 0n, nonce, gas,
+      maxFeePerGas: feeData.maxFeePerGas,
+      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
       chainId: ACTIVE_CHAIN_ID, type: "eip1559",
     };
 
@@ -283,39 +286,38 @@ export function registerAccountTools(server, { owsExec, readApiKey, walletName, 
       } catch {}
     }
 
-    return { txHash, status, blockNumber, aaNonce, rawOutput: result };
+    return { txHash, status, blockNumber, rawOutput: result };
   }
 
   server.tool(
     "account_request_whitelist",
-    "Submit an on-chain request to whitelist a (target, selector) pair so the agent can interact with a new contract/function. The owner must approve the request before it takes effect. Broadcasts the tx directly.",
+    "Submit an on-chain request to whitelist a (target, selector) pair so the agent can interact with a new contract/function. Calls requestWhitelistAdditionAsAgent directly on the IsolatedAccount (no executeAuthorized needed). The owner must approve the request before it takes effect.",
     {
       target: z.string().describe("Contract address to whitelist"),
       selector: z.string().describe("Function selector (4-byte hex, e.g. '0xa9059cbb' for transfer). Use '0xffffffff' for wildcard (all functions)"),
-      metadata: z.string().describe("Justification for the request (e.g. 'Uniswap V3 Router - exactInputSingle swap')"),
+      metadata: z.string().describe("Justification for the request (e.g. 'Uniswap V3 Router - exactInputSingle swap; allowedDestination=0x...; dailyLimit=100/day')"),
     },
     async ({ target, selector, metadata }) => {
       try {
         const calldata = encodeFunctionData({
-          abi: WHITELIST_REQUEST_ABI,
-          functionName: "requestWhitelistAddition",
+          abi: ISOLATED_ACCOUNT_WHITELIST_ABI,
+          functionName: "requestWhitelistAdditionAsAgent",
           args: [target, selector, metadata],
         });
 
-        const { txHash, status, blockNumber, aaNonce } = await broadcastViaMCP(whitelistModuleAddr, calldata, "0");
+        const { txHash, status, blockNumber } = await broadcastAgentTx(accountAddress, calldata);
 
         const lines = [
           `Whitelist Request Submitted`,
           `  Target: ${target}`,
           `  Selector: ${selector}`,
           `  Metadata: ${metadata}`,
-          `  Module: ${whitelistModuleAddr}`,
+          `  Account: ${accountAddress}`,
           ``,
           `  Tx Hash: ${txHash || "(unknown)"}`,
           `  Status: ${status}`,
         ];
         if (blockNumber) lines.push(`  Block: ${blockNumber}`);
-        if (aaNonce !== undefined) lines.push(`  AA Nonce: ${aaNonce.toString()}`);
         if (txHash) lines.push(`  Explorer: ${explorerTxUrl(txHash)}`);
         lines.push(``);
         lines.push(`The request is now pending on-chain. The account owner must approve it.`);
@@ -329,19 +331,19 @@ export function registerAccountTools(server, { owsExec, readApiKey, walletName, 
 
   server.tool(
     "account_cancel_whitelist_request",
-    "Cancel a pending whitelist request that the agent previously submitted. Broadcasts the tx directly.",
+    "Cancel a pending whitelist request that the agent previously submitted. Calls cancelWhitelistRequestAsAgent directly on the IsolatedAccount.",
     {
       requestId: z.number().describe("The request ID to cancel"),
     },
     async ({ requestId }) => {
       try {
         const calldata = encodeFunctionData({
-          abi: WHITELIST_REQUEST_ABI,
-          functionName: "cancelRequest",
+          abi: ISOLATED_ACCOUNT_WHITELIST_ABI,
+          functionName: "cancelWhitelistRequestAsAgent",
           args: [BigInt(requestId)],
         });
 
-        const { txHash, status, blockNumber } = await broadcastViaMCP(whitelistModuleAddr, calldata, "0");
+        const { txHash, status, blockNumber } = await broadcastAgentTx(accountAddress, calldata);
 
         const lines = [
           `Whitelist Request #${requestId} — Cancellation`,
@@ -358,6 +360,19 @@ export function registerAccountTools(server, { owsExec, readApiKey, walletName, 
     }
   );
 
+  async function resolveWhitelistModule() {
+    const client = getPublicClient();
+    const addr = await client.readContract({
+      address: accountAddress,
+      abi: WHITELIST_MODULE_ABI,
+      functionName: "whitelistModule",
+    });
+    if (!addr || addr === "0x0000000000000000000000000000000000000000") {
+      throw new Error("No WhitelistRequestModule configured on this account");
+    }
+    return addr;
+  }
+
   server.tool(
     "account_get_pending_requests",
     "List all pending whitelist requests for this account.",
@@ -365,8 +380,9 @@ export function registerAccountTools(server, { owsExec, readApiKey, walletName, 
     async () => {
       const client = getPublicClient();
 
+      const moduleAddr = await resolveWhitelistModule();
       const pending = await client.readContract({
-        address: whitelistModuleAddr,
+        address: moduleAddr,
         abi: WHITELIST_REQUEST_ABI,
         functionName: "getPendingRequests",
         args: [accountAddress],
@@ -401,8 +417,9 @@ export function registerAccountTools(server, { owsExec, readApiKey, walletName, 
       const client = getPublicClient();
 
       try {
+        const moduleAddr = await resolveWhitelistModule();
         const req = await client.readContract({
-          address: whitelistModuleAddr,
+          address: moduleAddr,
           abi: WHITELIST_REQUEST_ABI,
           functionName: "getRequest",
           args: [accountAddress, BigInt(requestId)],

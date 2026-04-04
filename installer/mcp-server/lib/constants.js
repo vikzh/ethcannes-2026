@@ -1,7 +1,6 @@
 import { base, baseSepolia, sepolia } from "viem/chains";
 
-// AA Smart Account config (set via env vars)
-export const AA_ACCOUNT = process.env.AA_ACCOUNT_ADDRESS || "";
+export const FACTORY_ADDRESS = process.env.FACTORY_ADDRESS || "";
 export const AA_CHAIN_ID = parseInt(process.env.AA_CHAIN_ID || "11155111", 10);
 
 const CHAIN_MAP = {
@@ -22,7 +21,7 @@ const EXPLORER_MAP = {
   [sepolia.id]: "https://sepolia.etherscan.io",
 };
 
-export const ACTIVE_CHAIN = CHAIN_MAP[AA_CHAIN_ID] || (AA_ACCOUNT ? sepolia : base);
+export const ACTIVE_CHAIN = CHAIN_MAP[AA_CHAIN_ID] || (FACTORY_ADDRESS ? sepolia : base);
 export const ACTIVE_CHAIN_ID = ACTIVE_CHAIN.id;
 
 export const RPC_URL =
