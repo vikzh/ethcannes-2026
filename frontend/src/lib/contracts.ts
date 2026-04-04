@@ -208,6 +208,17 @@ export const POLICY_HOOK_ABI = [
     inputs: [{ name: "ruleId", type: "bytes32" }],
     outputs: [],
   },
+  {
+    name: "addEnsPolicy",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "ensName", type: "string" },
+      { name: "maxPerPeriod", type: "uint256" },
+      { name: "periodDuration", type: "uint256" },
+    ],
+    outputs: [{ name: "ruleId", type: "bytes32" }],
+  },
 ] as const;
 
 export const ERC20_ABI = [

@@ -31,7 +31,7 @@ import {
   SEPOLIA_TOKENS,
 } from "@/lib/contracts";
 
-type RuleType = "whitelist" | "narrow";
+type RuleType = "whitelist" | "narrow" | "ens" | "custom";
 
 /** Special value in the token dropdown meaning "enter address manually" */
 const CUSTOM_TOKEN = "__custom__" as const;
@@ -93,6 +93,10 @@ export function AddRuleModal({
   );
   const [maxAmount, setMaxAmount] = useState("");
   const [periodIndex, setPeriodIndex] = useState(2); // default: 1 day
+  const [ensRule, setEnsRule] = useState("");
+  const [customSource, setCustomSource] = useState("");
+  const [customDestination, setCustomDestination] = useState("");
+  const [customSelector, setCustomSelector] = useState("0xa9059cbb");
 
   const isCustom = selectedToken === CUSTOM_TOKEN;
   const knownToken = !isCustom
@@ -157,9 +161,17 @@ export function AddRuleModal({
     }
   }, [isConfirmed, onClose, onSuccess]);
 
+  const normalizedCustomSource = normalizeAddress(customSource);
+  const normalizedCustomDestination = normalizeAddress(customDestination);
+  const isValidSelector = /^0x[0-9a-fA-F]{8}$/.test(customSelector);
+
   const canSubmit =
-    isValidToken &&
-    (ruleType === "whitelist" || (isValidDestination && maxAmount.length > 0)) &&
+    (ruleType === "ens"
+      ? ensRule.trim().length > 0 && maxAmount.length > 0
+      : ruleType === "custom"
+        ? !!normalizedCustomSource && !!normalizedCustomDestination && isValidSelector && maxAmount.length > 0
+        : isValidToken &&
+          (ruleType === "whitelist" || (isValidDestination && maxAmount.length > 0))) &&
     !isSigning &&
     !isConfirming &&
     !isConfirmed;
@@ -167,11 +179,43 @@ export function AddRuleModal({
   function handleSubmit() {
     resetWrite();
 
-    if (!normalizedTokenAddress) return;
-
     let hookCalldata: `0x${string}`;
 
-    if (ruleType === "whitelist") {
+    if (ruleType === "custom") {
+      if (!normalizedCustomSource || !normalizedCustomDestination) return;
+      const parsedAmount = parseUnits(maxAmount, 18);
+      const period = PERIOD_OPTIONS[periodIndex].seconds;
+
+      hookCalldata = encodeFunctionData({
+        abi: POLICY_HOOK_ABI,
+        functionName: "addEqRuleWithSpend",
+        args: [
+          normalizedCustomSource,
+          customSelector as `0x${string}`,
+          [
+            {
+              paramIndex: 0,
+              expectedValue: addressToBytes32(normalizedCustomDestination),
+            },
+          ],
+          {
+            spendParamIndex: 1,
+            maxPerPeriod: parsedAmount,
+            periodDuration: BigInt(period),
+          },
+        ],
+      });
+    } else if (ruleType === "ens") {
+      // addEnsPolicy(ensName, maxPerPeriod, periodDuration)
+      const parsedAmount = parseUnits(maxAmount, 18);
+      const period = PERIOD_OPTIONS[periodIndex].seconds;
+      hookCalldata = encodeFunctionData({
+        abi: POLICY_HOOK_ABI,
+        functionName: "addEnsPolicy",
+        args: [ensRule.trim(), parsedAmount, BigInt(period)],
+      });
+    } else if (ruleType === "whitelist") {
+      if (!normalizedTokenAddress) return;
       // addWhitelistEntry(tokenAddress, transferSelector)
       hookCalldata = encodeFunctionData({
         abi: POLICY_HOOK_ABI,
@@ -179,6 +223,7 @@ export function AddRuleModal({
         args: [normalizedTokenAddress, TRANSFER_SELECTOR],
       });
     } else {
+      if (!normalizedTokenAddress) return;
       if (!normalizedDestination) return;
 
       // addEqRuleWithSpend — narrow rule restricting destination
@@ -230,7 +275,7 @@ export function AddRuleModal({
       />
 
       {/* Modal */}
-      <div className="relative z-10 w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-8 shadow-2xl">
+      <div className="relative z-10 w-full max-w-3xl rounded-3xl border border-zinc-200 bg-white p-8 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold tracking-tight text-zinc-900">
@@ -250,11 +295,25 @@ export function AddRuleModal({
         </p>
 
         {/* Rule type toggle */}
-        <div className="mt-6 flex gap-2">
+        <div className="mt-6 flex items-stretch gap-2">
+          <button
+            type="button"
+            onClick={() => setRuleType("ens")}
+            className={`flex-1 rounded-xl border px-4 py-3 text-left text-sm transition-all flex flex-col justify-center ${
+              ruleType === "ens"
+                ? "border-zinc-900 bg-zinc-900 text-white"
+                : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
+            }`}
+          >
+            <span className="font-medium">ENS policy</span>
+            <span className="mt-1 block text-xs opacity-70">
+              Token &amp; destination via ENS name
+            </span>
+          </button>
           <button
             type="button"
             onClick={() => setRuleType("narrow")}
-            className={`flex-1 rounded-xl border px-4 py-3 text-left text-sm transition-all ${
+            className={`flex-1 rounded-xl border px-4 py-3 text-left text-sm transition-all flex flex-col justify-center ${
               ruleType === "narrow"
                 ? "border-zinc-900 bg-zinc-900 text-white"
                 : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
@@ -268,7 +327,7 @@ export function AddRuleModal({
           <button
             type="button"
             onClick={() => setRuleType("whitelist")}
-            className={`flex-1 rounded-xl border px-4 py-3 text-left text-sm transition-all ${
+            className={`flex-1 rounded-xl border px-4 py-3 text-left text-sm transition-all flex flex-col justify-center ${
               ruleType === "whitelist"
                 ? "border-zinc-900 bg-zinc-900 text-white"
                 : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
@@ -279,34 +338,114 @@ export function AddRuleModal({
               Allow transfers to any address
             </span>
           </button>
+          <button
+            type="button"
+            onClick={() => setRuleType("custom")}
+            className={`flex-1 rounded-xl border px-4 py-3 text-left text-sm transition-all flex flex-col justify-center ${
+              ruleType === "custom"
+                ? "border-zinc-900 bg-zinc-900 text-white"
+                : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
+            }`}
+          >
+            <span className="font-medium">Custom rule</span>
+            <span className="mt-1 block text-xs opacity-70">
+              Specify all fields manually
+            </span>
+          </button>
         </div>
 
         {/* Form */}
         <div className="mt-6 space-y-4">
-          {/* Token selector */}
-          <div>
-            <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
-              Token
-            </label>
-            <div className="relative mt-1.5">
-              <select
-                value={selectedToken}
-                onChange={(e) => setSelectedToken(e.target.value)}
-                className="w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 pr-10 text-sm text-zinc-900 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
-              >
-                {SEPOLIA_TOKENS.map((t) => (
-                  <option key={t.address} value={t.address}>
-                    {t.name} ({t.symbol})
-                  </option>
-                ))}
-                <option value={CUSTOM_TOKEN}>Custom token...</option>
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+          {/* ENS policy field */}
+          {ruleType === "ens" && (
+            <div>
+              <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
+                ENS rule
+              </label>
+              <input
+                type="text"
+                placeholder="vitalik.buterin:uniswap"
+                value={ensRule}
+                onChange={(e) => setEnsRule(e.target.value)}
+                className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+              />
+              <p className="mt-1.5 text-xs text-zinc-500">
+                ENS policy name that combines token address and destination (e.g. owner:protocol)
+              </p>
             </div>
-          </div>
+          )}
+
+          {/* Custom rule fields */}
+          {ruleType === "custom" && (
+            <>
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  Source address (target contract)
+                </label>
+                <input
+                  type="text"
+                  placeholder="0x..."
+                  value={customSource}
+                  onChange={(e) => setCustomSource(e.target.value.trim())}
+                  className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  Destination address
+                </label>
+                <input
+                  type="text"
+                  placeholder="0x..."
+                  value={customDestination}
+                  onChange={(e) => setCustomDestination(e.target.value.trim())}
+                  className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  Function selector
+                </label>
+                <input
+                  type="text"
+                  placeholder="0xa9059cbb"
+                  value={customSelector}
+                  onChange={(e) => setCustomSelector(e.target.value.trim())}
+                  className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm font-mono text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                />
+                <p className="mt-1.5 text-xs text-zinc-500">
+                  4-byte function selector (e.g. 0xa9059cbb for ERC-20 transfer)
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* Token selector — hidden for ENS policy and custom rule */}
+          {ruleType !== "ens" && ruleType !== "custom" && (
+            <div>
+              <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Token
+              </label>
+              <div className="relative mt-1.5">
+                <select
+                  value={selectedToken}
+                  onChange={(e) => setSelectedToken(e.target.value)}
+                  className="w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 pr-10 text-sm text-zinc-900 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                >
+                  {SEPOLIA_TOKENS.map((t) => (
+                    <option key={t.address} value={t.address}>
+                      {t.name} ({t.symbol})
+                    </option>
+                  ))}
+                  <option value={CUSTOM_TOKEN}>Custom token...</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+              </div>
+            </div>
+          )}
 
           {/* Custom token address — shown only when "Custom token" is selected */}
-          {isCustom && (
+          {ruleType !== "ens" && ruleType !== "custom" && isCustom && (
             <div>
               <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
                 Token contract address
@@ -326,25 +465,27 @@ export function AddRuleModal({
             </div>
           )}
 
-          {/* Narrow rule fields */}
+          {/* Narrow-only: Allowed destination */}
           {ruleType === "narrow" && (
-            <>
-              {/* Allowed destination */}
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
-                  Allowed destination address
-                </label>
-                <input
-                  type="text"
-                  placeholder="0x..."
-                  value={allowedDestination}
-                  onChange={(e) =>
-                    setAllowedDestination(e.target.value.trim())
-                  }
-                  className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
-                />
-              </div>
+            <div>
+              <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Allowed destination address
+              </label>
+              <input
+                type="text"
+                placeholder="0x..."
+                value={allowedDestination}
+                onChange={(e) =>
+                  setAllowedDestination(e.target.value.trim())
+                }
+                className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+              />
+            </div>
+          )}
 
+          {/* Max amount & Period — shown for narrow and ens */}
+          {(ruleType === "narrow" || ruleType === "ens" || ruleType === "custom") && (
+            <>
               {/* Max amount */}
               <div>
                 <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
