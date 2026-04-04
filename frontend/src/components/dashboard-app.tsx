@@ -13,10 +13,11 @@ import {
 import { startTransition, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount } from "wagmi";
-import type { Address } from "viem";
+import { type Address, formatUnits } from "viem";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Header } from "@/components/header";
 import { AddRuleModal } from "@/components/add-rule-modal";
+import { SEPOLIA_TOKENS } from "@/lib/contracts";
 
 interface AccountData {
   id: string;
@@ -135,6 +136,19 @@ function formatDuration(seconds: string) {
   if (s >= 3600 && s % 3600 === 0) return `${s / 3600} hour${s / 3600 === 1 ? "" : "s"}`;
   if (s >= 60 && s % 60 === 0) return `${s / 60} minute${s / 60 === 1 ? "" : "s"}`;
   return `${s}s`;
+}
+
+function formatTokenAmount(rawAmount: string, target: string, fallbackLabel?: string) {
+  if (rawAmount === "0") return "Unlimited";
+  const token = SEPOLIA_TOKENS.find(
+    (t) => t.address.toLowerCase() === target.toLowerCase(),
+  );
+  const decimals = token?.decimals ?? 18;
+  const formatted = formatUnits(BigInt(rawAmount), decimals);
+  const rawLabel = token?.symbol ?? fallbackLabel ?? "";
+  const bracketMatch = rawLabel.match(/\(([^)]+)\)/);
+  const symbol = bracketMatch ? bracketMatch[1] : rawLabel;
+  return symbol ? `${formatted} ${symbol}` : formatted;
 }
 
 function formatTimestamp(value?: string | null) {
@@ -533,7 +547,7 @@ export function DashboardApp() {
                                 Max Per Period
                               </p>
                               <p className="mt-1 text-sm text-zinc-900">
-                                {policy.maxPerPeriod === "0" ? "Unlimited" : policy.maxPerPeriod}
+                                {formatTokenAmount(policy.maxPerPeriod, policy.target, policy.tokenLabel)}
                               </p>
                             </div>
                             <div>
