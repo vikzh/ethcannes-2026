@@ -84,9 +84,17 @@ const aaInstructions = AA_ACCOUNT
     `- account_get_spend_limit: Read spend limit for a token`,
     `- account_get_policy: Read policy config (paused, native value cap)`,
     ``,
+    `Whitelist Management Tools:`,
+    `- account_request_whitelist: Request whitelisting of a (target, selector) pair.`,
+    `  The request goes through the WhitelistRequestModule. The owner must approve it.`,
+    `  Returns a tx object — pass it to send_transaction to submit on-chain.`,
+    `- account_cancel_whitelist_request: Cancel a pending whitelist request you submitted.`,
+    `- account_get_pending_requests: List all pending whitelist requests for the account.`,
+    `- account_get_whitelist_request: Look up a specific request by ID.`,
+    ``,
     `If a transaction reverts with "NotWhitelisted" or "SpendLimitExceeded",`,
-    `use the inspection tools to diagnose the issue. The owner must update`,
-    `the whitelist or spend limits via the account's execute path.`,
+    `use account_check_whitelist to verify, then account_request_whitelist to`,
+    `request the missing entry. The owner must approve it before retrying.`,
   ]
   : [];
 
@@ -231,7 +239,7 @@ registerTransactionTools(server, { owsExec, readApiKey, walletName: WALLET_NAME,
 
 // --- AA inspection tools ---
 
-registerAccountTools(server);
+registerAccountTools(server, { owsExec, readApiKey, walletName: WALLET_NAME, agentAddress });
 
 // --- Legacy prompt (kept for backwards compat) ---
 
