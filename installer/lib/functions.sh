@@ -4,10 +4,23 @@
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-DEFAULT_ALLOWED_CHAINS='["eip155:8453", "eip155:84532"]'
+DEFAULT_ALLOWED_CHAINS='["eip155:8453", "eip155:84532", "eip155:11155111"]'
 POLICY_ID="agent-chain-only"
 KEY_NAME="agent-key"
 DEFAULT_WALLET_NAME="agent-wallet"
+
+# get_factory_address -- reads AbstractAccountFactory address from contracts/deployments/sepolia.json
+get_factory_address() {
+  local deploy_json="${INSTALLER_LIB_DIR%/lib}/../contracts/deployments/sepolia.json"
+  if [[ -f "$deploy_json" ]]; then
+    python3 -c "
+import json
+with open('${deploy_json}') as f:
+    d = json.load(f)
+print(d['contracts']['AbstractAccountFactory']['address'])
+" 2>/dev/null
+  fi
+}
 
 # get_agent_display_name agent_type
 get_agent_display_name() {
@@ -532,9 +545,14 @@ install_mcp_deps_quiet() {
 # Returns the MCP server JSON config for agent registration.
 _mcp_server_json() {
   local wallet_name="$1"
-  local server_path
+  local server_path factory_addr
   server_path="$(get_mcp_server_path)"
-  printf '{"command":"node","args":["%s"],"env":{"AGENT_WALLET_NAME":"%s"}}' "$server_path" "$wallet_name"
+  factory_addr="$(get_factory_address)"
+  if [[ -n "$factory_addr" ]]; then
+    printf '{"command":"node","args":["%s"],"env":{"AGENT_WALLET_NAME":"%s","FACTORY_ADDRESS":"%s"}}' "$server_path" "$wallet_name" "$factory_addr"
+  else
+    printf '{"command":"node","args":["%s"],"env":{"AGENT_WALLET_NAME":"%s"}}' "$server_path" "$wallet_name"
+  fi
 }
 
 # register_mcp agent_type wallet_name
@@ -566,8 +584,9 @@ register_mcp_openclaw() {
 _write_openclaw_mcp_json() {
   local wallet_name="$1"
   local config_file="${HOME}/.openclaw/openclaw.json"
-  local server_path
+  local server_path factory_addr
   server_path="$(get_mcp_server_path)"
+  factory_addr="$(get_factory_address)"
   mkdir -p "$(dirname "$config_file")"
   # OpenClaw config uses "mcp": { "servers": { ... } } (not "mcpServers")
   if [[ -f "$config_file" ]]; then
@@ -582,15 +601,25 @@ if 'mcp' not in cfg:
     cfg['mcp'] = {}
 if 'servers' not in cfg['mcp']:
     cfg['mcp']['servers'] = {}
+env = {'AGENT_WALLET_NAME': '${wallet_name}'}
+fa = '${factory_addr}'
+if fa:
+    env['FACTORY_ADDRESS'] = fa
 cfg['mcp']['servers']['agent-wallet'] = {
     'command': 'node',
     'args': ['${server_path}'],
-    'env': {'AGENT_WALLET_NAME': '${wallet_name}'}
+    'env': env
 }
 with open('${config_file}', 'w') as f:
     json.dump(cfg, f, indent=2)
 " 2>/dev/null || print_warning "Could not update ${config_file}"
   else
+    local env_json
+    if [[ -n "$factory_addr" ]]; then
+      env_json="\"AGENT_WALLET_NAME\": \"${wallet_name}\", \"FACTORY_ADDRESS\": \"${factory_addr}\""
+    else
+      env_json="\"AGENT_WALLET_NAME\": \"${wallet_name}\""
+    fi
     cat > "$config_file" <<MCPEOF
 {
   "mcp": {
@@ -598,7 +627,7 @@ with open('${config_file}', 'w') as f:
       "agent-wallet": {
         "command": "node",
         "args": ["${server_path}"],
-        "env": {"AGENT_WALLET_NAME": "${wallet_name}"}
+        "env": {${env_json}}
       }
     }
   }
@@ -612,13 +641,18 @@ MCPEOF
 # Claude Code CLI uses ~/.claude.json via `claude mcp add`.
 register_mcp_claude() {
   local wallet_name="$1"
-  local server_path
+  local server_path factory_addr
   server_path="$(get_mcp_server_path)"
+  factory_addr="$(get_factory_address)"
 
   # Try Claude Code CLI first
   if command -v claude &>/dev/null; then
+    local env_flags=("--env" "AGENT_WALLET_NAME=${wallet_name}")
+    if [[ -n "$factory_addr" ]]; then
+      env_flags+=("--env" "FACTORY_ADDRESS=${factory_addr}")
+    fi
     claude mcp add agent-wallet --transport stdio --scope user \
-      --env "AGENT_WALLET_NAME=${wallet_name}" \
+      "${env_flags[@]}" \
       -- node "$server_path" &>/dev/null || true
   fi
 
@@ -632,10 +666,14 @@ with open('${desktop_config}') as f:
     cfg = json.load(f)
 if 'mcpServers' not in cfg:
     cfg['mcpServers'] = {}
+env = {'AGENT_WALLET_NAME': '${wallet_name}'}
+fa = '${factory_addr}'
+if fa:
+    env['FACTORY_ADDRESS'] = fa
 cfg['mcpServers']['agent-wallet'] = {
     'command': 'node',
     'args': ['${server_path}'],
-    'env': {'AGENT_WALLET_NAME': '${wallet_name}'}
+    'env': env
 }
 with open('${desktop_config}', 'w') as f:
     json.dump(cfg, f, indent=2)
@@ -647,8 +685,9 @@ with open('${desktop_config}', 'w') as f:
 # register_mcp_codex wallet_name
 register_mcp_codex() {
   local wallet_name="$1"
-  local server_path
+  local server_path factory_addr
   server_path="$(get_mcp_server_path)"
+  factory_addr="$(get_factory_address)"
   local config_file="${HOME}/.codex/config.toml"
   mkdir -p "$(dirname "$config_file")"
 
@@ -667,12 +706,18 @@ with open('${config_file}', 'w') as f:
   fi
 
   # Append MCP server config
+  local env_toml
+  if [[ -n "$factory_addr" ]]; then
+    env_toml="{ AGENT_WALLET_NAME = \"${wallet_name}\", FACTORY_ADDRESS = \"${factory_addr}\" }"
+  else
+    env_toml="{ AGENT_WALLET_NAME = \"${wallet_name}\" }"
+  fi
   cat >> "$config_file" <<CODEXEOF
 
 [mcp_servers.agent-wallet]
 command = "node"
 args = ["${server_path}"]
-environment = { AGENT_WALLET_NAME = "${wallet_name}" }
+environment = ${env_toml}
 CODEXEOF
 }
 
