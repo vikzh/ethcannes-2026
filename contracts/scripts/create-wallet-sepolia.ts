@@ -39,7 +39,10 @@ async function main() {
   }
 
   const [owner] = await ethers.getSigners();
-  const ownerAddress = await owner.getAddress();
+  const deployerAddress = await owner.getAddress();
+  const targetOwnerAddress = process.env.OWNER_ADDRESS
+    ? requireAddress(process.env.OWNER_ADDRESS, "OWNER_ADDRESS")
+    : deployerAddress;
   const deployments = await loadDeploymentRecord();
 
   const policyHookAddress = requireAddress(
@@ -66,7 +69,7 @@ async function main() {
   const installWhitelist = parseBool(process.env.INSTALL_WHITELIST_MODULE, true);
   const installEmergency = parseBool(process.env.INSTALL_EMERGENCY_CONTROLS, true);
   const installAgentValidator = parseBool(process.env.INSTALL_AGENT_SESSION_VALIDATOR, true);
-  const rawAgentAddress = process.env.AGENT_ADDRESS || ownerAddress;
+  const rawAgentAddress = process.env.AGENT_ADDRESS || targetOwnerAddress;
   const agentAddress = requireAddress(rawAgentAddress, "AGENT_ADDRESS");
   const validAfter = BigInt(process.env.AGENT_VALID_AFTER || "0");
   const validUntil = BigInt(process.env.AGENT_VALID_UNTIL || "0");
@@ -98,7 +101,9 @@ async function main() {
   }
 
   console.log("Creating wallet with:");
-  console.log(`- owner: ${ownerAddress}`);
+  console.log(`- deployer: ${deployerAddress}`);
+  console.log(`- target owner: ${targetOwnerAddress}`);
+  console.log(`- agent: ${agentAddress}`);
   console.log(`- factory: ${factoryAddress}`);
   console.log(`- policyHook: ${policyHookAddress}`);
   console.log(`- salt: ${salt}`);
@@ -115,8 +120,20 @@ async function main() {
     await setTx.wait();
   }
 
+  if (targetOwnerAddress.toLowerCase() !== deployerAddress.toLowerCase()) {
+    const transferTx = await account.transferOwnership(targetOwnerAddress);
+    await transferTx.wait();
+    console.log(`- ownership transferred to: ${targetOwnerAddress}`);
+  }
+
+  const onchainOwner = await account.owner();
+  if (onchainOwner.toLowerCase() !== targetOwnerAddress.toLowerCase()) {
+    throw new Error(`Owner mismatch after setup. expected=${targetOwnerAddress} actual=${onchainOwner}`);
+  }
+
   console.log("Wallet created successfully:");
   console.log(`- account: ${predicted}`);
+  console.log(`- owner: ${onchainOwner}`);
   console.log(`- txHash: ${receipt.hash}`);
   console.log(`- block: ${receipt.blockNumber}`);
 }
