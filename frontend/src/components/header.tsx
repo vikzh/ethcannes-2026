@@ -30,13 +30,13 @@ function AddressAvatar({ address }: { address: string }) {
 export function Header() {
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200 px-5">
-      <Link href="/" className="flex items-center gap-2">
+      <Link href="/" className="flex items-center gap-3">
         <Image
-          src="/logo.svg"
-          alt="Logo"
-          width={40}
-          height={40}
-          className="h-20 w-20 object-contain"
+          src="/logo2.png"
+          alt="Wallet Console logo"
+          width={120}
+          height={80}
+          className="h-9 w-auto object-contain"
         />
         <span className="text-lg font-semibold tracking-tight">
           Safe wallet for<span className="text-zinc-500"> AI agents</span>
