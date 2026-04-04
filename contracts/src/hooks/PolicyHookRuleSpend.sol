@@ -34,7 +34,7 @@ contract PolicyHookRuleSpend is IPolicyHookRuleSpend {
     using ModeCodeLib for ModeCode;
 
     // Sentinel: spendParamIndex == 255 means no per-rule spend tracking.
-    uint8 private constant SPEND_DISABLED = type(uint8).max;
+    uint8 internal constant SPEND_DISABLED = type(uint8).max;
 
     // -------------------------------------------------------------------------
     // Storage
@@ -53,23 +53,23 @@ contract PolicyHookRuleSpend is IPolicyHookRuleSpend {
         uint256 periodStart;
     }
 
-    mapping(address account => mapping(bytes32 key => bool))           private _whitelist;
-    mapping(address account => mapping(address token => SpendLimit))   private _spendLimits;
-    mapping(address account => PolicyConfig)                           private _policy;
-    mapping(address account => bool)                                   private _initialized;
+    mapping(address account => mapping(bytes32 key => bool))           internal _whitelist;
+    mapping(address account => mapping(address token => SpendLimit))   internal _spendLimits;
+    mapping(address account => PolicyConfig)                           internal _policy;
+    mapping(address account => bool)                                   internal _initialized;
 
-    mapping(address account => mapping(bytes32 ruleId => StoredEqRule))  private _eqRules;
-    mapping(address account => mapping(bytes32 ruleId => bool))          private _eqRuleKnown;
-    mapping(address account => mapping(bytes32 wlKey  => bytes32[]))     private _eqRuleIdsByKey;
+    mapping(address account => mapping(bytes32 ruleId => StoredEqRule))  internal _eqRules;
+    mapping(address account => mapping(bytes32 ruleId => bool))          internal _eqRuleKnown;
+    mapping(address account => mapping(bytes32 wlKey  => bytes32[]))     internal _eqRuleIdsByKey;
 
     // Enumeration indexes — used by the UI to list all configured rules/entries.
     // Whitelist entries: array of (target, selector) pairs per account.
     struct WhitelistEntryIndex { address target; bytes4 selector; }
-    mapping(address account => WhitelistEntryIndex[]) private _whitelistIndex;
+    mapping(address account => WhitelistEntryIndex[]) internal _whitelistIndex;
     // Spend limit token list per account.
-    mapping(address account => address[])   private _spendLimitTokens;
+    mapping(address account => address[])   internal _spendLimitTokens;
     // All ruleIds ever added per account (includes removed ones — check active flag).
-    mapping(address account => bytes32[])   private _allRuleIds;
+    mapping(address account => bytes32[])   internal _allRuleIds;
 
     // -------------------------------------------------------------------------
     // IERC7579Module
@@ -136,7 +136,10 @@ contract PolicyHookRuleSpend is IPolicyHookRuleSpend {
     // -------------------------------------------------------------------------
 
     function addWhitelistEntry(address target, bytes4 selector) external override {
-        address account = msg.sender;
+        _addWhitelistEntry(msg.sender, target, selector);
+    }
+
+    function _addWhitelistEntry(address account, address target, bytes4 selector) internal {
         bytes32 key = PolicyTypes.whitelistKey(target, selector);
         if (_whitelist[account][key]) revert EntryAlreadyExists(target, selector);
         _whitelist[account][key] = true;
@@ -578,7 +581,7 @@ contract PolicyHookRuleSpend is IPolicyHookRuleSpend {
     // ── private helpers ───────────────────────────────────────────────────────
 
     function _getActiveWhitelistEntries(address account)
-        private view returns (WhitelistEntryView[] memory)
+        internal view returns (WhitelistEntryView[] memory)
     {
         WhitelistEntryIndex[] storage index = _whitelistIndex[account];
         uint256 total = index.length;
@@ -605,7 +608,7 @@ contract PolicyHookRuleSpend is IPolicyHookRuleSpend {
     }
 
     function _getSpendLimits(address account)
-        private view returns (SpendLimitView[] memory)
+        internal view returns (SpendLimitView[] memory)
     {
         address[] storage tokens = _spendLimitTokens[account];
         uint256 total = tokens.length;
@@ -634,7 +637,7 @@ contract PolicyHookRuleSpend is IPolicyHookRuleSpend {
     }
 
     function _getActiveRules(address account)
-        private view returns (RuleView[] memory)
+        internal view returns (RuleView[] memory)
     {
         bytes32[] storage allIds = _allRuleIds[account];
         uint256 total = allIds.length;
