@@ -167,7 +167,7 @@ export function AddRuleModal({
       });
     }
 
-    const executionCalldata = encodeSingle(policyHookAddress, 0n, hookCalldata);
+    const executionCalldata = encodeSingle(policyHookAddress, BigInt(0), hookCalldata);
 
     writeContract({
       address: accountAddress,
