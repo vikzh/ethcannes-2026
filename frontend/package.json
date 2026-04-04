@@ -3,10 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "contracts:compile": "cd ../contracts && npm install --ignore-scripts && npx hardhat compile",
-    "predev": "npm run contracts:compile",
     "dev": "next dev",
-    "prebuild": "npm run contracts:compile",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

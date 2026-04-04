@@ -2,9 +2,24 @@
 node_modules/
 
 # Hardhat build outputs
-artifacts/
 cache/
 typechain-types/
+
+# Artifacts — ignore everything except the ABIs the frontend imports.
+# After recompiling contracts, commit the updated JSON files.
+artifacts/*
+!artifacts/src/
+artifacts/src/*
+!artifacts/src/factory/
+artifacts/src/factory/*
+!artifacts/src/factory/AbstractAccountFactory.sol/
+artifacts/src/factory/AbstractAccountFactory.sol/*
+!artifacts/src/factory/AbstractAccountFactory.sol/AbstractAccountFactory.json
+!artifacts/src/accounts/
+artifacts/src/accounts/*
+!artifacts/src/accounts/IsolatedAccount.sol/
+artifacts/src/accounts/IsolatedAccount.sol/*
+!artifacts/src/accounts/IsolatedAccount.sol/IsolatedAccount.json
 
 # Coverage
 coverage/
