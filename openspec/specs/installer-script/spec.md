@@ -1,27 +1,90 @@
 ## ADDED Requirements
 
-### Requirement: Custom MCP server
+### Requirement: Custom MCP server with DeFi capabilities
 The installer SHALL include a custom MCP server at `installer/mcp-server/` built
-with `@modelcontextprotocol/sdk` (Node.js). The server SHALL expose OWS signing
-operations as MCP tools that agents can call without direct `ows` CLI access.
+with `@modelcontextprotocol/sdk` and `viem` (Node.js). The server SHALL expose
+OWS wallet operations and DeFi protocol interactions as MCP tools that agents
+can call without direct `ows` CLI access. All on-chain interactions target
+Base (chainId 8453).
 
 The MCP server SHALL include an `instructions` option in the McpServer constructor.
 The instructions string SHALL include: wallet name, wallet EVM address (resolved
-dynamically at startup), chain info (Base), and usage guidance for available tools.
+dynamically at startup), chain info (Base), comprehensive tool catalog, common
+token addresses, typical workflow guidance, and stuck-transaction recovery steps.
 The address SHALL be read from OWS at server startup.
 
-Initial tools:
+#### Core wallet tools:
 - `sign_message`: Signs a message using the agent's OWS wallet. Accepts `message`
   (string) and `chain` (string, default `base`). Returns the signature hex string.
   Internally calls `ows sign message` with the API key from the key file.
+- `get_address`: Returns the agent wallet's EVM address. No parameters.
+
+#### Uniswap V3 tools (`tools/uniswap.js`):
+- `uniswap_swap`: Encodes a Uniswap V3 `exactInputSingle` swap transaction.
+  Accepts `tokenIn`, `tokenOut`, `amountIn` (human-readable), `fee` (default 3000),
+  `slippageBps` (default 50), optional `recipient`. Uses on-chain quoter for
+  slippage protection. Returns encoded tx object for `send_transaction`.
+- `uniswap_quote`: Gets a price quote without executing. Returns expected output
+  amount, gas estimate, and ticks crossed.
+
+#### Aave V3 tools (`tools/aave.js`):
+- `aave_supply`: Encodes a supply/deposit transaction.
+- `aave_withdraw`: Encodes a withdrawal transaction. Supports `amount: "max"`.
+- `aave_borrow`: Encodes a borrow transaction. Default: variable rate (mode 2).
+- `aave_repay`: Encodes a repayment transaction. Supports `amount: "max"`.
+- `aave_get_user_data`: Reads account health factor, collateral, debt (on-chain).
+- `aave_get_reserves`: Lists available Aave V3 reserve markets (on-chain).
+
+#### Token and balance tools (`tools/balance.js`, `tools/token.js`):
+- `get_balance`: Checks native ETH and/or ERC-20 token balance (on-chain).
+- `get_token_info`: Reads token metadata: name, symbol, decimals, total supply.
+- `approve_erc20`: Encodes an ERC-20 approval transaction. Supports unlimited approval.
+- `transfer_erc20`: Encodes an ERC-20 transfer transaction.
+
+#### Generic contract tools (`tools/contract.js`):
+- `contract_read`: Calls any view/pure function on any contract. Accepts ABI as
+  JSON array or human-readable format.
+- `contract_encode`: Encodes calldata for any contract function. Returns tx object.
+
+#### Transaction execution tools (`tools/transaction.js`):
+- `send_transaction`: Signs and broadcasts an encoded tx via OWS. Supports optional
+  nonce and gas overrides for replacing stuck transactions. Waits for receipt.
+- `cancel_transaction`: Cancels a stuck tx by self-transfer at the same nonce with
+  higher gas.
+- `get_pending_nonce`: Checks confirmed vs pending nonce to detect stuck transactions.
+- `get_transaction`: Looks up a transaction by hash.
+
+#### Shared infrastructure:
+- `lib/constants.js`: Token addresses (WETH, USDC, USDT, DAI, cbETH, wstETH),
+  protocol addresses (Uniswap V3 Router, Quoter; Aave V3 Pool), decimal mappings.
+- `lib/rpc.js`: Singleton viem `PublicClient` for Base RPC.
+- `lib/abi/`: ABI fragments for ERC-20, Uniswap V3 SwapRouter/QuoterV2, Aave V3 Pool.
+
+#### Legacy prompt (deprecated):
+- `uniswap-swap`: Kept for backwards compatibility. Marked as `[DEPRECATED]` in
+  description. Returns a message directing users to `uniswap_swap` tool instead.
+  Uses `z.string().optional()` with manual defaults (not `z.string().default()`)
+  to avoid SDK validation hang.
 
 The MCP server runs as a stdio process spawned by the agent runtime. It reads
 the API key from `~/.ows/<wallet-name>.key` and uses it as `OWS_PASSPHRASE`
-when invoking `ows` subprocess commands.
+when invoking `ows` subprocess commands. Version: `0.2.0`.
 
 #### Scenario: Agent calls sign_message via MCP
 - **WHEN** an agent invokes the `sign_message` MCP tool with `{"message": "hello", "chain": "base"}`
 - **THEN** the MCP server reads the API key, calls `ows sign message`, and returns the signature
+
+#### Scenario: Agent encodes a Uniswap swap
+- **WHEN** an agent calls `uniswap_swap` with tokenIn (WETH), tokenOut (USDC), amountIn "0.01"
+- **THEN** the server encodes `exactInputSingle` calldata, queries on-chain quote for slippage, and returns a tx object targeting the Uniswap V3 Router
+
+#### Scenario: Agent encodes an Aave supply
+- **WHEN** an agent calls `aave_supply` with asset (USDC) and amount "100"
+- **THEN** the server encodes Aave V3 `supply` calldata and returns a tx object targeting the Aave Pool
+
+#### Scenario: Agent sends a transaction
+- **WHEN** an agent calls `send_transaction` with a tx object from a DeFi tool
+- **THEN** the server estimates gas, signs via OWS, broadcasts, waits for receipt, and returns hash + status
 
 #### Scenario: MCP server starts with missing key file
 - **WHEN** the key file does not exist at the expected path
@@ -29,7 +92,7 @@ when invoking `ows` subprocess commands.
 
 #### Scenario: MCP server returns instructions during init
 - **WHEN** a client sends an `initialize` request
-- **THEN** the response includes an `instructions` field with wallet address and tool guidance
+- **THEN** the response includes an `instructions` field with wallet address, full tool catalog, token addresses, workflow guidance, and stuck-tx recovery steps
 
 #### Scenario: Instructions contain dynamic wallet address
 - **WHEN** the MCP server starts with `AGENT_WALLET_NAME=agent-wallet`
@@ -145,7 +208,7 @@ and exit with a clear error if not found.
 
 ### Requirement: MCP server npm install
 The installer SHALL run `npm install` in the `mcp-server/` directory to install
-dependencies (`@modelcontextprotocol/sdk`).
+dependencies (`@modelcontextprotocol/sdk`, `viem`).
 
 #### Scenario: npm install succeeds
 - **WHEN** `npm install` completes in the mcp-server directory

@@ -31,22 +31,49 @@ Mock at `tests/mocks/ows`. Deterministic output, recorded invocations, failure s
 
 ---
 
-### Requirement: MCP server unit tests
-Tests SHALL verify the MCP server responds correctly to JSON-RPC calls.
+### Requirement: MCP server integration tests
+Tests SHALL verify the MCP server responds correctly via the MCP Client SDK
+(`test-client.js`). Tests cover initialization, tool registration, prompt
+handling, tool invocation, and DeFi encoding.
 
-#### Scenario: tools/list returns sign_message
-- **WHEN** `tools/list` JSON-RPC request is piped to the MCP server
-- **THEN** response includes a tool named `sign_message` with correct input schema
+#### Scenario: Initialize returns instructions with full tool catalog
+- **WHEN** a client connects and reads instructions
+- **THEN** instructions are a non-empty string mentioning `sign_message`,
+  `get_address`, `uniswap_swap`, `aave_supply`, `send_transaction`,
+  `get_balance`, `approve_erc20`, and `contract_read`
 
-#### Scenario: sign_message returns signature with mock OWS
-- **WHEN** `tools/call` with `sign_message` is piped to MCP server in sandbox
-- **THEN** response contains a signature string
-- **AND** `$MOCK_OWS_LOG` shows `sign message` was called
+#### Scenario: tools/list returns all 20 tools
+- **WHEN** `tools/list` is called
+- **THEN** response includes at least 18 tools: `sign_message`, `get_address`,
+  `uniswap_swap`, `uniswap_quote`, `aave_supply`, `aave_withdraw`, `aave_borrow`,
+  `aave_repay`, `aave_get_user_data`, `aave_get_reserves`, `get_balance`,
+  `get_token_info`, `approve_erc20`, `transfer_erc20`, `contract_read`,
+  `contract_encode`, `send_transaction`, `get_transaction`
+- **AND** each tool has correct input schema (verified for sign_message,
+  uniswap_swap, aave_supply, send_transaction, contract_read)
 
-#### Scenario: Initialize returns instructions
-- **WHEN** `initialize` JSON-RPC request is sent to MCP server
-- **THEN** response contains `instructions` field
-- **AND** instructions mention `sign_message` and `get_address`
+#### Scenario: Legacy uniswap-swap prompt is deprecated
+- **WHEN** `prompts/list` is called
+- **THEN** `uniswap-swap` prompt exists with `[DEPRECATED]` in description
+- **AND** `prompts/get` returns a message containing `uniswap-v3-swap` and deprecation notice
+
+#### Scenario: sign_message returns signature
+- **WHEN** `tools/call` with `sign_message` is invoked
+- **THEN** response contains a hex signature string of at least 128 characters
+
+#### Scenario: get_address returns valid address
+- **WHEN** `tools/call` with `get_address` is invoked
+- **THEN** response contains a valid `0x`-prefixed 42-character address
+
+#### Scenario: DeFi tool encoding (pure, no RPC)
+- **WHEN** `approve_erc20`, `transfer_erc20`, `contract_encode`, `aave_supply`,
+  `aave_borrow` are invoked with valid parameters
+- **THEN** each returns a preview text and encoded tx object with `to`, `data`,
+  and `chainId: 8453`
+
+#### Scenario: uniswap_swap encoding
+- **WHEN** `uniswap_swap` is invoked with WETH->USDC 0.01
+- **THEN** response includes preview text and encoded tx targeting the Uniswap V3 Router
 
 ---
 
