@@ -21,7 +21,7 @@ export function registerTokenTools(server, _defaultAddress) {
       let amountWei;
       let amountDisplay;
       if (amount) {
-        const decimals = getDecimals(tokenAddress);
+        const decimals = await getDecimals(tokenAddress);
         amountWei = parseUnits(amount, decimals);
         amountDisplay = amount;
       } else {
@@ -71,7 +71,7 @@ export function registerTokenTools(server, _defaultAddress) {
         .describe("Amount to transfer in human-readable units"),
     },
     async ({ tokenAddress, to, amount }) => {
-      const decimals = getDecimals(tokenAddress);
+      const decimals = await getDecimals(tokenAddress);
       const amountWei = parseUnits(amount, decimals);
 
       const calldata = encodeFunctionData({

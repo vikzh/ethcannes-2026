@@ -1,0 +1,3 @@
+[submodule "submodules/speculos"]
+	path = submodules/speculos
+	url = git@github.com:LedgerHQ/speculos.git

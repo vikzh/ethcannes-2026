@@ -22,7 +22,7 @@ export function registerAaveTools(server, defaultAddress) {
     },
     async ({ asset, amount, onBehalfOf }) => {
       const behalf = onBehalfOf || defaultAddress;
-      const decimals = getDecimals(asset);
+      const decimals = await getDecimals(asset);
       const amountWei = parseUnits(amount, decimals);
 
       const calldata = encodeFunctionData({
@@ -73,7 +73,7 @@ export function registerAaveTools(server, defaultAddress) {
     },
     async ({ asset, amount, to }) => {
       const recipient = to || defaultAddress;
-      const decimals = getDecimals(asset);
+      const decimals = await getDecimals(asset);
       const amountWei =
         amount.toLowerCase() === "max"
           ? 2n ** 256n - 1n // type(uint256).max signals "withdraw all"
@@ -130,7 +130,7 @@ export function registerAaveTools(server, defaultAddress) {
     },
     async ({ asset, amount, interestRateMode, onBehalfOf }) => {
       const behalf = onBehalfOf || defaultAddress;
-      const decimals = getDecimals(asset);
+      const decimals = await getDecimals(asset);
       const amountWei = parseUnits(amount, decimals);
 
       const calldata = encodeFunctionData({
@@ -185,7 +185,7 @@ export function registerAaveTools(server, defaultAddress) {
     },
     async ({ asset, amount, interestRateMode, onBehalfOf }) => {
       const behalf = onBehalfOf || defaultAddress;
-      const decimals = getDecimals(asset);
+      const decimals = await getDecimals(asset);
       const amountWei =
         amount.toLowerCase() === "max"
           ? 2n ** 256n - 1n

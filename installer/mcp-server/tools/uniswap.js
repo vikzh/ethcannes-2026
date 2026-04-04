@@ -1,9 +1,8 @@
 import { z } from "zod";
 import { encodeFunctionData, parseUnits, formatUnits } from "viem";
 import { SWAP_ROUTER_ABI, QUOTER_V2_ABI } from "../lib/abi/uniswap-v3.js";
-import { PROTOCOLS, TOKENS, getDecimals, TOKEN_DECIMALS, ACTIVE_CHAIN_ID } from "../lib/constants.js";
+import { PROTOCOLS, TOKENS, getDecimals, ACTIVE_CHAIN_ID } from "../lib/constants.js";
 import { getPublicClient } from "../lib/rpc.js";
-import { ERC20_ABI } from "../lib/abi/erc20.js";
 
 const SYMBOL_BY_ADDRESS = Object.fromEntries(
   Object.entries(TOKENS).map(([sym, addr]) => [addr.toLowerCase(), sym])
@@ -11,22 +10,6 @@ const SYMBOL_BY_ADDRESS = Object.fromEntries(
 
 function tokenLabel(addr) {
   return SYMBOL_BY_ADDRESS[addr.toLowerCase()] || addr;
-}
-
-async function resolveDecimals(tokenAddress) {
-  const known = TOKEN_DECIMALS[tokenAddress.toLowerCase()];
-  if (known !== undefined) return known;
-  try {
-    const client = getPublicClient();
-    const d = await client.readContract({
-      address: tokenAddress,
-      abi: ERC20_ABI,
-      functionName: "decimals",
-    });
-    return Number(d);
-  } catch {
-    return 18;
-  }
 }
 
 export function registerUniswapTools(server, defaultAddress) {
@@ -59,8 +42,8 @@ export function registerUniswapTools(server, defaultAddress) {
     async ({ tokenIn, tokenOut, amountIn, fee, slippageBps, recipient }) => {
       const to = recipient || defaultAddress;
       const [decimalsIn, decimalsOut] = await Promise.all([
-        resolveDecimals(tokenIn),
-        resolveDecimals(tokenOut),
+        getDecimals(tokenIn),
+        getDecimals(tokenOut),
       ]);
       const amountInWei = parseUnits(amountIn, decimalsIn);
 
@@ -164,8 +147,8 @@ export function registerUniswapTools(server, defaultAddress) {
     },
     async ({ tokenIn, tokenOut, amountIn, fee }) => {
       const [decimalsIn, decimalsOut] = await Promise.all([
-        resolveDecimals(tokenIn),
-        resolveDecimals(tokenOut),
+        getDecimals(tokenIn),
+        getDecimals(tokenOut),
       ]);
       const amountInWei = parseUnits(amountIn, decimalsIn);
       const labelIn = tokenLabel(tokenIn);

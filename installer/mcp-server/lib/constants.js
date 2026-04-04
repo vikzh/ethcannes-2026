@@ -40,6 +40,7 @@ export function explorerAddressUrl(addr) {
   return `${EXPLORER_BASE}/address/${addr}`;
 }
 
+// --- Base mainnet tokens ---
 export const TOKENS = {
   WETH: "0x4200000000000000000000000000000000000006",
   USDC: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
@@ -50,6 +51,16 @@ export const TOKENS = {
   wstETH: "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452",
 };
 
+// --- Sepolia testnet tokens ---
+export const SEPOLIA_TOKENS = {
+  USDC:  "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+  USDT:  "0x7169D38820dfd117C3FA1f22a697dBA58d90BA06",
+  DAI:   "0x68194a729C2450ad26072b3D33ADaCbcef39D574",
+  WETH:  "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9",
+  LINK:  "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+  MOCK:  "0xF29934Cc706E20ddA4Ba265FdE0d69c2e35E3988",
+};
+
 export const PROTOCOLS = {
   UNISWAP_V3_ROUTER: "0x2626664c2603336E57B271c5C0b26F421741e481",
   UNISWAP_V3_QUOTER: "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a",
@@ -58,6 +69,7 @@ export const PROTOCOLS = {
 };
 
 const _decimalsRaw = {
+  // Base mainnet
   [TOKENS.WETH]: 18,
   [TOKENS.USDC]: 6,
   [TOKENS.USDbC]: 6,
@@ -65,12 +77,39 @@ const _decimalsRaw = {
   [TOKENS.DAI]: 18,
   [TOKENS.cbETH]: 18,
   [TOKENS.wstETH]: 18,
+  // Sepolia testnet
+  [SEPOLIA_TOKENS.USDC]: 6,
+  [SEPOLIA_TOKENS.USDT]: 6,
+  [SEPOLIA_TOKENS.DAI]: 18,
+  [SEPOLIA_TOKENS.WETH]: 18,
+  [SEPOLIA_TOKENS.LINK]: 18,
+  [SEPOLIA_TOKENS.MOCK]: 18,
 };
 
 export const TOKEN_DECIMALS = Object.fromEntries(
   Object.entries(_decimalsRaw).map(([k, v]) => [k.toLowerCase(), v])
 );
 
-export function getDecimals(tokenAddress) {
-  return TOKEN_DECIMALS[tokenAddress.toLowerCase()] ?? 18;
+/**
+ * Resolve token decimals: check known map first, then query on-chain, fallback to 18.
+ * Lazy-imports rpc.js and erc20.js to avoid circular dependency at module init.
+ * @param {string} tokenAddress
+ * @returns {Promise<number>}
+ */
+export async function getDecimals(tokenAddress) {
+  const known = TOKEN_DECIMALS[tokenAddress.toLowerCase()];
+  if (known !== undefined) return known;
+  try {
+    const { getPublicClient } = await import("./rpc.js");
+    const { ERC20_ABI } = await import("./abi/erc20.js");
+    const client = getPublicClient();
+    const d = await client.readContract({
+      address: tokenAddress,
+      abi: ERC20_ABI,
+      functionName: "decimals",
+    });
+    return Number(d);
+  } catch {
+    return 18;
+  }
 }
