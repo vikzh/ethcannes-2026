@@ -46,6 +46,34 @@ interface AccountWithRules extends AccountData {
   rules: RuleData[];
 }
 
+interface ChangelogEvent {
+  type: "account_created" | "rule_created" | "rule_approved" | "rule_updated";
+  title: string;
+  description: string;
+  timestamp: string;
+  txHash: string | null;
+}
+
+async function fetchChangelog(
+  owner: string,
+): Promise<{ events: ChangelogEvent[] }> {
+  const params = new URLSearchParams({ owner });
+  const res = await fetch(`/api/changelog?${params.toString()}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error("Unable to load changelog.");
+  }
+  return (await res.json()) as { events: ChangelogEvent[] };
+}
+
+const EVENT_STYLES: Record<ChangelogEvent["type"], { bg: string; text: string; label: string }> = {
+  account_created: { bg: "bg-blue-50", text: "text-blue-700", label: "Created" },
+  rule_created: { bg: "bg-amber-50", text: "text-amber-700", label: "Requested" },
+  rule_approved: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Approved" },
+  rule_updated: { bg: "bg-zinc-100", text: "text-zinc-700", label: "Updated" },
+};
+
 async function fetchAccountsByOwner(
   owner: string,
   chainId: number,
@@ -121,6 +149,9 @@ export function DashboardApp() {
   const [homeLoading, setHomeLoading] = useState(false);
   const [homeError, setHomeError] = useState<string | null>(null);
   const [homeReloadKey, setHomeReloadKey] = useState(0);
+  const [changelogEntries, setChangelogEntries] = useState<ChangelogEvent[]>([]);
+  const [changelogLoading, setChangelogLoading] = useState(false);
+  const [changelogError, setChangelogError] = useState<string | null>(null);
   const hasAccount = accountData !== null;
   const resetDisconnectedState = () => {
     setAccountData(null);
@@ -208,6 +239,33 @@ export function DashboardApp() {
 
     return () => { cancelled = true; };
   }, [activeNav, address, chainId, hasAccount, homeReloadKey, isConnected]);
+
+  useEffect(() => {
+    if (!isConnected || !hasAccount || !accountData || activeNav !== "changelog") {
+      return;
+    }
+
+    let cancelled = false;
+    setChangelogLoading(true);
+    setChangelogError(null);
+
+    fetchChangelog(address!)
+      .then((response) => {
+        if (!cancelled) {
+          setChangelogEntries(response.events);
+          setChangelogLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setChangelogEntries([]);
+          setChangelogError("Unable to load changelog from The Graph.");
+          setChangelogLoading(false);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [activeNav, accountData, hasAccount, isConnected]);
 
   const router = useRouter();
 
@@ -369,6 +427,100 @@ export function DashboardApp() {
     );
   };
 
+  const renderChangelogPanel = () => {
+    if (changelogLoading) {
+      return (
+        <div className="flex min-h-[420px] w-full items-center justify-center rounded-[28px] border border-zinc-200 bg-white/90 px-8 py-12 shadow-[0_24px_80px_-48px_rgba(0,0,0,0.55)]">
+          <div className="flex items-center gap-3 text-sm text-zinc-600">
+            <LoaderCircle className="h-5 w-5 animate-spin text-zinc-900" />
+            Loading changelog...
+          </div>
+        </div>
+      );
+    }
+
+    if (changelogError) {
+      return (
+        <div className="w-full max-w-3xl rounded-[28px] border border-rose-200 bg-rose-50/80 p-8 shadow-[0_24px_80px_-48px_rgba(0,0,0,0.55)]">
+          <div className="flex items-start gap-3">
+            <CircleAlert className="mt-0.5 h-5 w-5 text-rose-600" />
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-900">
+                Changelog unavailable
+              </h2>
+              <p className="mt-2 text-sm text-zinc-600">{changelogError}</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (changelogEntries.length === 0) {
+      return (
+        <div className="w-full max-w-4xl rounded-[28px] border border-zinc-200 bg-white p-8 text-center shadow-[0_20px_70px_-52px_rgba(0,0,0,0.55)]">
+          <h2 className="text-xl font-semibold tracking-tight text-zinc-950">
+            No activity yet
+          </h2>
+          <p className="mt-2 text-sm text-zinc-600">
+            No account or rule changes have been recorded.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-full max-w-4xl space-y-3">
+        {changelogEntries.map((event, index) => {
+          const style = EVENT_STYLES[event.type];
+          return (
+            <article
+              key={`${event.timestamp}-${index}`}
+              className="flex gap-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm"
+            >
+              <div className="flex flex-col items-center pt-0.5">
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${style.bg}`}>
+                  {event.type === "account_created" ? (
+                    <ShieldCheck className={`h-4 w-4 ${style.text}`} />
+                  ) : (
+                    <ArrowLeftRight className={`h-4 w-4 ${style.text}`} />
+                  )}
+                </div>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-current/20 ${style.bg} ${style.text}`}>
+                      {style.label}
+                    </span>
+                    <h3 className="text-sm font-semibold text-zinc-900">
+                      {event.title}
+                    </h3>
+                  </div>
+                  <span className="text-xs text-zinc-500">
+                    {formatTimestamp(event.timestamp)}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-sm text-zinc-600">
+                  {event.description}
+                </p>
+                {event.txHash && (
+                  <a
+                    href={`https://sepolia.etherscan.io/tx/${event.txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-block text-xs font-medium text-zinc-400 underline decoration-zinc-300 transition-colors hover:text-zinc-700"
+                  >
+                    View on Etherscan
+                  </a>
+                )}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-white text-zinc-900">
       <Header />
@@ -435,6 +587,7 @@ export function DashboardApp() {
             <main className="flex-1 overflow-auto p-6">
               <div className="mx-auto flex min-h-full max-w-5xl items-center justify-center">
                 {activeNav === "rules" ? renderHomePanel() : null}
+                {activeNav === "changelog" ? renderChangelogPanel() : null}
               </div>
             </main>
           )}
