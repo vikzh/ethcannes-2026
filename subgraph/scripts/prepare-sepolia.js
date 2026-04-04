@@ -34,6 +34,7 @@ function main() {
   const factory = mustGetContract(deployments, "AbstractAccountFactory");
   const whitelistModule = mustGetContract(deployments, "WhitelistRequestModule");
   const policyHook = getContractWithFallback(deployments, "PolicyHookRuleSpend", "PolicyHook");
+  const agentSessionValidator = mustGetContract(deployments, "AgentSessionValidator");
 
   const template = fs.readFileSync(templatePath, "utf8");
   const result = template
@@ -42,7 +43,12 @@ function main() {
     .replace(/__WHITELIST_MODULE_ADDRESS__/g, whitelistModule.address)
     .replace(/__WHITELIST_MODULE_START_BLOCK__/g, String(whitelistModule.deploymentBlock))
     .replace(/__POLICY_HOOK_ADDRESS__/g, policyHook.address)
-    .replace(/__POLICY_HOOK_START_BLOCK__/g, String(policyHook.deploymentBlock));
+    .replace(/__POLICY_HOOK_START_BLOCK__/g, String(policyHook.deploymentBlock))
+    .replace(/__AGENT_SESSION_VALIDATOR_ADDRESS__/g, agentSessionValidator.address)
+    .replace(
+      /__AGENT_SESSION_VALIDATOR_START_BLOCK__/g,
+      String(agentSessionValidator.deploymentBlock)
+    );
 
   fs.writeFileSync(outputPath, result);
   console.log(`Generated ${outputPath}`);

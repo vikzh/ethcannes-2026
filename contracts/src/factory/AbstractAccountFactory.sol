@@ -19,9 +19,19 @@ contract AbstractAccountFactory {
         bytes32 salt,
         address policyHook
     );
+    event AgentWalletBound(address indexed agent, address indexed account);
+    event UserWalletBound(address indexed user, address indexed account);
+    event AgentFunded(address indexed agent, uint256 amount);
 
     error ZeroModuleAddress();
+    error ZeroAgentAddress();
     error DeploymentFailed();
+    error AgentFundingTransferFailed(address agent, uint256 amount);
+    error AgentAlreadyHasWallet(address agent, address existingAccount);
+    error UserAlreadyHasWallet(address user, address existingAccount);
+
+    mapping(address agent => address account) private _walletByAgent;
+    mapping(address user => address account) private _walletByUser;
 
     /// @notice Deploys a new account with CREATE2 and optional module setup.
     /// @param salt CREATE2 salt.
@@ -30,8 +40,17 @@ contract AbstractAccountFactory {
     function deployAccount(
         bytes32 salt,
         address policyHook,
-        ModuleInit[] calldata modules
-    ) external returns (address account) {
+        ModuleInit[] calldata modules,
+        address agent
+    ) external payable returns (address account) {
+        if (agent == address(0)) revert ZeroAgentAddress();
+        address user = msg.sender;
+        address existingUserWallet = _walletByUser[user];
+        if (existingUserWallet != address(0)) revert UserAlreadyHasWallet(user, existingUserWallet);
+
+        address existing = _walletByAgent[agent];
+        if (existing != address(0)) revert AgentAlreadyHasWallet(agent, existing);
+
         bytes memory bytecode =
             abi.encodePacked(type(IsolatedAccount).creationCode, abi.encode(address(this), policyHook));
         address deployedAddress;
@@ -48,7 +67,26 @@ contract AbstractAccountFactory {
         deployed.transferOwnership(msg.sender);
 
         account = address(deployed);
+        _walletByAgent[agent] = account;
+        _walletByUser[user] = account;
+
+        if (msg.value > 0) {
+            (bool sent, ) = agent.call{ value: msg.value }("");
+            if (!sent) revert AgentFundingTransferFailed(agent, msg.value);
+            emit AgentFunded(agent, msg.value);
+        }
+
         emit AccountDeployed(account, msg.sender, msg.sender, salt, policyHook);
+        emit AgentWalletBound(agent, account);
+        emit UserWalletBound(user, account);
+    }
+
+    function getWalletByAgent(address agent) external view returns (address account) {
+        return _walletByAgent[agent];
+    }
+
+    function getWalletByUser(address user) external view returns (address account) {
+        return _walletByUser[user];
     }
 
     /// @notice Computes deterministic account address for given salt and policy hook.

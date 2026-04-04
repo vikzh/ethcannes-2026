@@ -2,35 +2,31 @@
   "network": "sepolia",
   "chainId": 11155111,
   "deployer": "0xFe56D5E15F74E3587ab5e60dc6Fd45DD71EdeF45",
-  "deployedAt": "2026-04-04T10:45:12.931Z",
+  "deployedAt": "2026-04-04T13:43:48.599Z",
   "contracts": {
     "PolicyHook": {
-      "address": "0x6e11448E0d1095650B0037C602C2Da53311EBFe3",
-      "deploymentBlock": 10587991
+      "address": "0x5c503c1ab20c3Ae4EB03c813c247Aa3ea9905bb0",
+      "deploymentBlock": 10588865
     },
     "PolicyHookRuleSpend": {
-      "address": "0x6e11448E0d1095650B0037C602C2Da53311EBFe3",
-      "deploymentBlock": 10587991
+      "address": "0x5c503c1ab20c3Ae4EB03c813c247Aa3ea9905bb0",
+      "deploymentBlock": 10588865
     },
     "AgentSessionValidator": {
-      "address": "0xF8E806eE3B00Eb9ED4285Ce5015A76c1B75B5258",
-      "deploymentBlock": 10587992
+      "address": "0xB43C39280071b25382299Dc68c9CddA41f025Bca",
+      "deploymentBlock": 10588866
     },
     "WhitelistRequestModule": {
-      "address": "0x76c4f12fd2f34F8b54a2a2639fC00Ae3fDc11dDd",
-      "deploymentBlock": 10587993
+      "address": "0x18FB4Ed46Bc7aF8a57638b410b7799fe7f16d534",
+      "deploymentBlock": 10588867
     },
     "EmergencyControls": {
-      "address": "0x3040Fa5e8d81D06397D2510e5619CE1a085B2135",
-      "deploymentBlock": 10587994
+      "address": "0x34103434d4AaA0479C2D8531628EaA1B301ba571",
+      "deploymentBlock": 10588868
     },
     "AbstractAccountFactory": {
-      "address": "0xa89b4648Da8b8c2B107D7057a6a944470675C83E",
-      "deploymentBlock": 10587995
-    },
-    "MockERC20": {
-      "address": "0x31f8C5034A18519f0ADd9adFb15968d468B3aAcF",
-      "deploymentBlock": 10588077
+      "address": "0xB2E33e5ad896EcF1834227c8c8c1f90fB3B40041",
+      "deploymentBlock": 10588869
     }
   }
 }

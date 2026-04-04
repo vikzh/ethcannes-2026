@@ -93,6 +93,29 @@ dataSources:
           handler: handleRuleSpendLimitSet
       file: ./src/policy-hook.ts
 
+  - kind: ethereum
+    name: AgentSessionValidator
+    network: sepolia
+    source:
+      abi: AgentSessionValidator
+      address: "__AGENT_SESSION_VALIDATOR_ADDRESS__"
+      startBlock: __AGENT_SESSION_VALIDATOR_START_BLOCK__
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - AgentSession
+      abis:
+        - name: AgentSessionValidator
+          file: ../contracts/artifacts/src/validators/AgentSessionValidator.sol/AgentSessionValidator.json
+      eventHandlers:
+        - event: SessionCreated(indexed address,indexed uint256,indexed address,uint48,uint48)
+          handler: handleSessionCreated
+        - event: SessionRevoked(indexed address,indexed uint256)
+          handler: handleSessionRevoked
+      file: ./src/agent-session-validator-static.ts
+
 templates:
   - kind: ethereum
     name: IsolatedAccount

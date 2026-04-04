@@ -80,6 +80,9 @@ export async function createWalletSepolia(): Promise<CreateWalletResult> {
   const agentAddress = requireAddress(rawAgentAddress, "AGENT_ADDRESS");
   const validAfter = BigInt(process.env.AGENT_VALID_AFTER || "0");
   const validUntil = BigInt(process.env.AGENT_VALID_UNTIL || "0");
+  const agentFundWei = process.env.AGENT_FUND_WEI?.trim()
+    ? BigInt(process.env.AGENT_FUND_WEI!.trim())
+    : 0n;
 
   const salt = resolveSalt(process.env.WALLET_SALT);
 
@@ -116,8 +119,13 @@ export async function createWalletSepolia(): Promise<CreateWalletResult> {
   console.log(`- salt: ${salt}`);
   console.log(`- predicted account: ${predicted}`);
   console.log(`- modules count: ${modules.length}`);
+  if (agentFundWei > 0n) {
+    console.log(`- agent funding (wei): ${agentFundWei}`);
+  }
 
-  const tx = await factory.deployAccount(salt, policyHookAddress, modules);
+  const tx = await factory.deployAccount(salt, policyHookAddress, modules, agentAddress, {
+    value: agentFundWei,
+  });
   const receipt = await tx.wait();
   if (!receipt) throw new Error("Missing deployment tx receipt");
 
