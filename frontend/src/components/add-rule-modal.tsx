@@ -36,11 +36,17 @@ type RuleType = "whitelist" | "narrow";
 /** Special value in the token dropdown meaning "enter address manually" */
 const CUSTOM_TOKEN = "__custom__" as const;
 
+export interface RulePrefill {
+  tokenAddress?: string;
+  destinationAddress?: string;
+}
+
 interface AddRuleModalProps {
   accountAddress: Address;
   policyHookAddress: Address;
   onClose: () => void;
   onSuccess: () => void;
+  prefill?: RulePrefill;
 }
 
 const PERIOD_OPTIONS = [
@@ -61,11 +67,30 @@ export function AddRuleModal({
   policyHookAddress,
   onClose,
   onSuccess,
+  prefill,
 }: AddRuleModalProps) {
-  const [ruleType, setRuleType] = useState<RuleType>("narrow");
-  const [selectedToken, setSelectedToken] = useState(SEPOLIA_TOKENS[0].address as string);
-  const [customTokenAddress, setCustomTokenAddress] = useState("");
-  const [allowedDestination, setAllowedDestination] = useState("");
+  // Resolve prefilled token: use known token if it matches, otherwise custom
+  const prefillKnown = prefill?.tokenAddress
+    ? SEPOLIA_TOKENS.find(
+        (t) => t.address.toLowerCase() === prefill.tokenAddress!.toLowerCase(),
+      )
+    : undefined;
+  const initialToken = prefillKnown
+    ? prefillKnown.address
+    : prefill?.tokenAddress
+      ? CUSTOM_TOKEN
+      : SEPOLIA_TOKENS[0].address;
+
+  const [ruleType, setRuleType] = useState<RuleType>(
+    prefill?.destinationAddress ? "narrow" : "narrow",
+  );
+  const [selectedToken, setSelectedToken] = useState(initialToken as string);
+  const [customTokenAddress, setCustomTokenAddress] = useState(
+    !prefillKnown && prefill?.tokenAddress ? prefill.tokenAddress : "",
+  );
+  const [allowedDestination, setAllowedDestination] = useState(
+    prefill?.destinationAddress ?? "",
+  );
   const [maxAmount, setMaxAmount] = useState("");
   const [periodIndex, setPeriodIndex] = useState(2); // default: 1 day
 
@@ -190,6 +215,7 @@ export function AddRuleModal({
       abi: ISOLATED_ACCOUNT_ABI,
       functionName: "execute",
       args: [MODE_SINGLE, executionCalldata],
+      gas: BigInt(5_000_000),
     });
   }
 

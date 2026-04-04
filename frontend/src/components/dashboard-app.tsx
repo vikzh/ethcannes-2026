@@ -16,7 +16,7 @@ import { useAccount } from "wagmi";
 import { type Address, formatUnits } from "viem";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Header } from "@/components/header";
-import { AddRuleModal } from "@/components/add-rule-modal";
+import { AddRuleModal, type RulePrefill } from "@/components/add-rule-modal";
 import { CreateAccountModal } from "@/components/create-account-modal";
 import { SEPOLIA_TOKENS } from "@/lib/contracts";
 
@@ -78,6 +78,9 @@ interface ChangelogEvent {
   description: string;
   timestamp: string;
   txHash: string | null;
+  account?: string;
+  target?: string;
+  selector?: string;
 }
 
 async function fetchChangelog(
@@ -152,6 +155,12 @@ function formatTokenAmount(rawAmount: string, target: string, fallbackLabel?: st
   return symbol ? `${formatted} ${symbol}` : formatted;
 }
 
+/** Try to extract an 0x address from a description string (e.g. "…to recipient 0xABC…") */
+function extractRecipientAddress(description: string): string | undefined {
+  const match = description.match(/(?:recipient|to)\s+(0x[0-9a-fA-F]{40})/i);
+  return match?.[1];
+}
+
 function formatTimestamp(value?: string | null) {
   if (!value) return "Unavailable";
   const timestamp = Number(value);
@@ -203,6 +212,7 @@ export function DashboardApp() {
   const [changelogLoading, setChangelogLoading] = useState(false);
   const [changelogError, setChangelogError] = useState<string | null>(null);
   const [addRuleAccount, setAddRuleAccount] = useState<AccountWithRules | null>(null);
+  const [addRulePrefill, setAddRulePrefill] = useState<RulePrefill | undefined>(undefined);
   const [showCreateAccount, setShowCreateAccount] = useState(false);
   const reloadRules = useCallback(() => setHomeReloadKey((k) => k + 1), []);
   const hasAccount = accountData !== null;
@@ -255,8 +265,7 @@ export function DashboardApp() {
       !isConnected ||
       !address ||
       !chainId ||
-      !hasAccount ||
-      activeNav !== "rules"
+      !hasAccount
     ) {
       return;
     }
@@ -312,7 +321,7 @@ export function DashboardApp() {
       });
 
     return () => { cancelled = true; };
-  }, [activeNav, address, chainId, hasAccount, homeReloadKey, isConnected]);
+  }, [address, chainId, hasAccount, homeReloadKey, isConnected]);
 
   useEffect(() => {
     if (!isConnected || !hasAccount || !accountData || activeNav !== "changelog") {
@@ -593,6 +602,21 @@ export function DashboardApp() {
     );
   };
 
+  const handleGenerateRule = (event: ChangelogEvent) => {
+    const account = event.account
+      ? homeAccounts.find(
+          (a) => a.id.toLowerCase() === event.account!.toLowerCase(),
+        )
+      : homeAccounts[0];
+    if (!account) return;
+    const destination = extractRecipientAddress(event.description);
+    setAddRulePrefill({
+      tokenAddress: event.target,
+      destinationAddress: destination,
+    });
+    setAddRuleAccount(account);
+  };
+
   const renderChangelogPanel = () => {
     if (changelogLoading) {
       return (
@@ -669,16 +693,30 @@ export function DashboardApp() {
                 <p className="mt-1.5 text-sm text-zinc-600">
                   {event.description}
                 </p>
-                {event.txHash && (
-                  <a
-                    href={`https://sepolia.etherscan.io/tx/${event.txHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-block text-xs font-medium text-zinc-400 underline decoration-zinc-300 transition-colors hover:text-zinc-700"
-                  >
-                    View on Etherscan
-                  </a>
-                )}
+                <div className="mt-2 flex items-center justify-between">
+                  <div>
+                    {event.txHash && (
+                      <a
+                        href={`https://sepolia.etherscan.io/tx/${event.txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block text-xs font-medium text-zinc-400 underline decoration-zinc-300 transition-colors hover:text-zinc-700"
+                      >
+                        View on Etherscan
+                      </a>
+                    )}
+                  </div>
+                  {event.type === "rule_created" && (
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateRule(event)}
+                      className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800 ring-1 ring-amber-200 transition-colors hover:bg-amber-200"
+                    >
+                      <Plus className="h-3 w-3" />
+                      Generate rule
+                    </button>
+                  )}
+                </div>
               </div>
             </article>
           );
@@ -780,8 +818,12 @@ export function DashboardApp() {
         <AddRuleModal
           accountAddress={addRuleAccount.id as Address}
           policyHookAddress={addRuleAccount.policyHook as Address}
-          onClose={() => setAddRuleAccount(null)}
+          onClose={() => {
+            setAddRuleAccount(null);
+            setAddRulePrefill(undefined);
+          }}
           onSuccess={reloadRules}
+          prefill={addRulePrefill}
         />
       )}
 

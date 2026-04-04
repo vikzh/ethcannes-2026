@@ -46,6 +46,10 @@ export interface ChangelogEvent {
   description: string;
   timestamp: string;
   txHash: string | null;
+  /** Structured fields for rule events (used for pre-filling "Add Rule" modal) */
+  account?: string;
+  target?: string;
+  selector?: string;
 }
 
 function buildEvents(
@@ -79,6 +83,9 @@ function buildEvents(
         description: meta || `Permission requested for ${action.toLowerCase()} to ${req.target.slice(0, 6)}...${req.target.slice(-4)}`,
         timestamp: req.createdAt,
         txHash: req.createdTxHash,
+        account: req.account,
+        target: req.target,
+        selector: req.selector,
       });
     }
 
