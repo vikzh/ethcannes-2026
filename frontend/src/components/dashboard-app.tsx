@@ -14,6 +14,7 @@ import { startTransition, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount } from "wagmi";
 import type { Address } from "viem";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Header } from "@/components/header";
 import { AddRuleModal } from "@/components/add-rule-modal";
 
@@ -143,11 +144,13 @@ function NavItem({
 
 export function DashboardApp() {
   const { address, chainId, isConnected } = useAccount();
+  const { openConnectModal } = useConnectModal();
 
   const [activeNav, setActiveNav] = useState<NavKey>("rules");
 
   const [accountData, setAccountData] = useState<AccountData | null>(null);
   const [accountLoading, setAccountLoading] = useState(false);
+  const [accountChecked, setAccountChecked] = useState(false);
   const [homeAccounts, setHomeAccounts] = useState<AccountWithRules[]>([]);
   const [homeLoading, setHomeLoading] = useState(false);
   const [homeError, setHomeError] = useState<string | null>(null);
@@ -161,6 +164,7 @@ export function DashboardApp() {
   const resetDisconnectedState = () => {
     setAccountData(null);
     setAccountLoading(false);
+    setAccountChecked(false);
     setHomeAccounts([]);
     setHomeError(null);
     setHomeLoading(false);
@@ -188,12 +192,14 @@ export function DashboardApp() {
         if (!cancelled) {
           setAccountData(response.accounts[0] ?? null);
           setAccountLoading(false);
+          setAccountChecked(true);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setAccountData(null);
           setAccountLoading(false);
+          setAccountChecked(true);
         }
       });
     return () => { cancelled = true; };
@@ -281,6 +287,13 @@ export function DashboardApp() {
   }, [activeNav, accountData, hasAccount, isConnected]);
 
   const router = useRouter();
+
+  // Auto-redirect to /onboard when wallet is connected but no account exists
+  useEffect(() => {
+    if (isConnected && accountChecked && !hasAccount) {
+      router.push("/onboard");
+    }
+  }, [isConnected, accountChecked, hasAccount, router]);
 
   const renderHomePanel = () => {
     if (homeLoading) {
@@ -592,10 +605,16 @@ export function DashboardApp() {
                 </ul>
                 <button
                   type="button"
-                  onClick={() => router.push("/onboard")}
+                  onClick={() => {
+                    if (!isConnected && openConnectModal) {
+                      openConnectModal();
+                    } else {
+                      router.push("/onboard");
+                    }
+                  }}
                   className="mt-8 rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
                 >
-                  Get started
+                  {isConnected ? "Get started" : "Connect wallet"}
                 </button>
               </div>
             </main>

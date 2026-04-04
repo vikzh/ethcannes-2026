@@ -222,6 +222,8 @@ print_header() {
 # Displays completion summary.
 print_summary_box() {
   local address="$1" wallet_name="$2" agents_display="$3" total_elapsed="${4:-}"
+  local onboard_base="${AGENT_ONBOARD_URL:-https://myleashai.vercel.app/onboard}"
+  local onboard_url="${onboard_base}?agent=${address}"
   printf "\n" >&2
   printf "  ${_GREEN}${_BOLD}Installation complete!${_RESET}\n" >&2
   printf "\n" >&2
@@ -230,11 +232,12 @@ print_summary_box() {
   if [[ -n "$agents_display" ]]; then
     printf "  Agents:   %s\n" "$agents_display" >&2
   fi
+  printf "  Onboard:  ${_CYAN}%s${_RESET}\n" "$onboard_url" >&2
   printf "\n" >&2
   if [[ -n "$total_elapsed" ]]; then
     printf "  ${_DIM}Done in %ss${_RESET}\n" "$total_elapsed" >&2
   fi
-  printf "  ${_DIM}Save this address for AA contract setup.${_RESET}\n" >&2
+  printf "  ${_DIM}Open the onboard URL to deploy your AA account.${_RESET}\n" >&2
   printf "\n" >&2
 }
 

@@ -19,7 +19,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@deployments/*": ["../contracts/deployments/*"],
+      "@artifacts/*": ["../contracts/artifacts/*"]
     }
   },
   "include": [
