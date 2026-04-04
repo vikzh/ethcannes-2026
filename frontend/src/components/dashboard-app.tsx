@@ -7,6 +7,7 @@ import {
   LoaderCircle,
   Plus,
   RefreshCw,
+  Shield,
   ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
@@ -16,6 +17,7 @@ import { useAccount } from "wagmi";
 import type { Address } from "viem";
 import { Header } from "@/components/header";
 import { AddRuleModal } from "@/components/add-rule-modal";
+import { useLedger } from "@/hooks/use-ledger";
 
 interface AccountData {
   id: string;
@@ -143,6 +145,7 @@ function NavItem({
 
 export function DashboardApp() {
   const { address, chainId, isConnected } = useAccount();
+  const { isLedger } = useLedger();
 
   const [activeNav, setActiveNav] = useState<NavKey>("rules");
 
@@ -351,6 +354,12 @@ export function DashboardApp() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2 self-start">
+                    {isLedger && (
+                      <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+                        <Shield className="h-3.5 w-3.5" />
+                        Ledger Protected
+                      </div>
+                    )}
                     <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
                       <ShieldCheck className="h-4 w-4" />
                       {account.rules.length} approved rule{account.rules.length === 1 ? "" : "s"}
@@ -583,6 +592,7 @@ export function DashboardApp() {
                     "Transaction frequency",
                     "Always allowed actions",
                     "One-time approvals",
+                    "Ledger hardware approval for high-risk actions",
                   ].map((item) => (
                     <li key={item} className="flex items-center gap-2.5 text-sm text-zinc-600">
                       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[10px] font-bold text-zinc-500">✓</span>

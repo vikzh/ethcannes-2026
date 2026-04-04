@@ -7,7 +7,9 @@ import {
   CheckCircle2,
   AlertTriangle,
   ChevronDown,
+  Shield,
 } from "lucide-react";
+import { useLedger } from "@/hooks/use-ledger";
 import {
   useWriteContract,
   useWaitForTransactionReceipt,
@@ -51,6 +53,7 @@ export function AddRuleModal({
   onClose,
   onSuccess,
 }: AddRuleModalProps) {
+  const { isLedger } = useLedger();
   const [ruleType, setRuleType] = useState<RuleType>("narrow");
   const [selectedToken, setSelectedToken] = useState(SEPOLIA_TOKENS[0].address as string);
   const [customTokenAddress, setCustomTokenAddress] = useState("");
@@ -345,6 +348,23 @@ export function AddRuleModal({
           )}
         </div>
 
+        {/* Ledger approval notice */}
+        {isLedger && !isConfirmed && (
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+            <Shield className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+            <div>
+              <p className="text-xs font-medium text-emerald-700">
+                Ledger hardware approval required
+              </p>
+              <p className="mt-0.5 text-xs text-emerald-600">
+                {isSigning
+                  ? "Review and confirm the transaction on your Ledger device now."
+                  : "This action will require physical confirmation on your Ledger device before any funds can move."}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Error */}
         {error && (
           <div className="mt-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3">
@@ -384,7 +404,7 @@ export function AddRuleModal({
             {isSigning ? (
               <>
                 <LoaderCircle className="h-4 w-4 animate-spin" />
-                Confirm in wallet...
+                {isLedger ? "Approve on Ledger..." : "Confirm in wallet..."}
               </>
             ) : isConfirming ? (
               <>

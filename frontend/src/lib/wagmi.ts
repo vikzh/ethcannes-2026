@@ -1,4 +1,11 @@
-import { getDefaultConfig } from "@rainbow-me/rainbowkit";
+import { connectorsForWallets } from "@rainbow-me/rainbowkit";
+import {
+  coinbaseWallet,
+  injectedWallet,
+  ledgerWallet,
+  metaMaskWallet,
+  walletConnectWallet,
+} from "@rainbow-me/rainbowkit/wallets";
 import { createConfig, http } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { injected } from "wagmi/connectors";
@@ -15,17 +22,36 @@ const sepoliaRpcUrl =
   process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL?.trim() || undefined;
 
 /**
- * Without a WalletConnect / Reown project ID we only register the injected
- * connector (MetaMask, Rabby, browser wallets). That avoids Reown’s origin
- * allowlist and the "localhost:3000 not found on Allowlist" console error.
+ * With a WalletConnect project ID we register the full wallet list including
+ * Ledger hardware wallet (via Ledger Connect Kit / WalletConnect). Ledger
+ * appears first so users see it as the recommended trust layer.
  *
- * When `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is set, add your dev origin at
- * https://cloud.reown.com (e.g. `http://localhost:3000`) or use injected-only.
+ * Without a project ID we fall back to injected-only (MetaMask, Rabby,
+ * Ledger Extension, or any other browser wallet).
  */
 export const wagmiConfig = useWalletConnect
-  ? getDefaultConfig({
-      appName: "Wallet Console",
-      projectId: walletConnectProjectId,
+  ? createConfig({
+      connectors: connectorsForWallets(
+        [
+          {
+            groupName: "Hardware Wallets",
+            wallets: [ledgerWallet],
+          },
+          {
+            groupName: "Software Wallets",
+            wallets: [
+              metaMaskWallet,
+              coinbaseWallet,
+              walletConnectWallet,
+              injectedWallet,
+            ],
+          },
+        ],
+        {
+          appName: "Wallet Console",
+          projectId: walletConnectProjectId,
+        },
+      ),
       chains: [sepolia],
       transports: {
         [sepolia.id]: http(sepoliaRpcUrl),
