@@ -5,14 +5,17 @@ import {
   BookOpen,
   CircleAlert,
   LoaderCircle,
+  Plus,
   RefreshCw,
   ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount } from "wagmi";
+import type { Address } from "viem";
 import { Header } from "@/components/header";
+import { AddRuleModal } from "@/components/add-rule-modal";
 
 interface AccountData {
   id: string;
@@ -152,6 +155,8 @@ export function DashboardApp() {
   const [changelogEntries, setChangelogEntries] = useState<ChangelogEvent[]>([]);
   const [changelogLoading, setChangelogLoading] = useState(false);
   const [changelogError, setChangelogError] = useState<string | null>(null);
+  const [addRuleAccount, setAddRuleAccount] = useState<AccountWithRules | null>(null);
+  const reloadRules = useCallback(() => setHomeReloadKey((k) => k + 1), []);
   const hasAccount = accountData !== null;
   const resetDisconnectedState = () => {
     setAccountData(null);
@@ -220,7 +225,15 @@ export function DashboardApp() {
             rulesByAccount.set(key, existing);
           }
 
-          const groupedAccounts = response.accounts.map((account) => ({
+          const seen = new Set<string>();
+          const uniqueAccounts = response.accounts.filter((account) => {
+            const key = account.id.toLowerCase();
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+
+          const groupedAccounts = uniqueAccounts.map((account) => ({
             ...account,
             rules: rulesByAccount.get(account.id.toLowerCase()) ?? [],
           }));
@@ -337,9 +350,19 @@ export function DashboardApp() {
                       Approved actions available for this account.
                     </p>
                   </div>
-                  <div className="inline-flex items-center gap-2 self-start rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
-                    <ShieldCheck className="h-4 w-4" />
-                    {account.rules.length} approved rule{account.rules.length === 1 ? "" : "s"}
+                  <div className="flex items-center gap-2 self-start">
+                    <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+                      <ShieldCheck className="h-4 w-4" />
+                      {account.rules.length} approved rule{account.rules.length === 1 ? "" : "s"}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAddRuleAccount(account)}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-zinc-800"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Rule
+                    </button>
                   </div>
                 </div>
               </div>
@@ -593,6 +616,15 @@ export function DashboardApp() {
           )}
         </div>
       </div>
+
+      {addRuleAccount && (
+        <AddRuleModal
+          accountAddress={addRuleAccount.id as Address}
+          policyHookAddress={addRuleAccount.policyHook as Address}
+          onClose={() => setAddRuleAccount(null)}
+          onSuccess={reloadRules}
+        />
+      )}
     </div>
   );
 }
