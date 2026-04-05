@@ -8,6 +8,7 @@ import {
   Plus,
   RefreshCw,
   ShieldCheck,
+  Sparkles,
   Trash2,
   type LucideIcon,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Header } from "@/components/header";
 import { AddRuleModal, type RulePrefill } from "@/components/add-rule-modal";
 import { CreateAccountModal } from "@/components/create-account-modal";
+import { ApplyPresetModal } from "@/components/apply-preset-modal";
 import { SEPOLIA_TOKENS, ISOLATED_ACCOUNT_ABI, POLICY_HOOK_ABI, MODE_SINGLE, encodeSingle } from "@/lib/contracts";
 
 interface AccountData {
@@ -216,6 +218,7 @@ export function DashboardApp() {
   const [addRulePrefill, setAddRulePrefill] = useState<RulePrefill | undefined>(undefined);
   const [showCreateAccount, setShowCreateAccount] = useState(false);
   const [removingRuleId, setRemovingRuleId] = useState<string | null>(null);
+  const [applyPresetAccount, setApplyPresetAccount] = useState<AccountWithRules | null>(null);
   const [policyStatusFilter, setPolicyStatusFilter] = useState<Set<"active" | "inactive">>(() => new Set(["active"]));
   const [policyActionFilter, setPolicyActionFilter] = useState<Set<string>>(() => new Set());
   const reloadRules = useCallback(() => setHomeReloadKey((k) => k + 1), []);
@@ -466,6 +469,14 @@ export function DashboardApp() {
                         {account.policyRules.length} polic{account.policyRules.length === 1 ? "y" : "ies"}
                       </div>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => setApplyPresetAccount(account)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Apply Preset
+                    </button>
                     <button
                       type="button"
                       onClick={() => setAddRuleAccount(account)}
@@ -942,6 +953,19 @@ export function DashboardApp() {
           onClose={() => setShowCreateAccount(false)}
           onSuccess={() => {
             setShowCreateAccount(false);
+            reloadRules();
+          }}
+        />
+      )}
+
+      {applyPresetAccount && (
+        <ApplyPresetModal
+          accountAddress={applyPresetAccount.id}
+          policyHookAddress={applyPresetAccount.policyHook}
+          chainId={chainId ?? 11155111}
+          onClose={() => setApplyPresetAccount(null)}
+          onApplied={() => {
+            setApplyPresetAccount(null);
             reloadRules();
           }}
         />

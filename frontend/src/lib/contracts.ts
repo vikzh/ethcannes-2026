@@ -108,9 +108,13 @@ export const ACCOUNT_ABI = accountArtifact.abi;
 // Execution helpers (used by dashboard add-rule-modal)
 // ---------------------------------------------------------------------------
 
-// MODE_SINGLE = 0x00...00 (32 zero bytes)
+// MODE_SINGLE = calltype 0x00 — first byte is calltype, rest are zero
 export const MODE_SINGLE =
   "0x0000000000000000000000000000000000000000000000000000000000000000" as const;
+
+// MODE_BATCH = calltype 0x01
+export const MODE_BATCH =
+  "0x0100000000000000000000000000000000000000000000000000000000000000" as const;
 
 /**
  * Encode a single execution for the IsolatedAccount.execute() call.
@@ -125,6 +129,28 @@ export function encodeSingle(
     ["address", "uint256", "bytes"],
     [target, value, callData],
   );
+}
+
+/**
+ * Encode a batch execution for the IsolatedAccount.execute() call.
+ * Layout: abi.encode(Execution[]) where Execution = (address target, uint256 value, bytes callData)
+ */
+export function encodeBatch(
+  calls: Array<{ target: Address; value: bigint; callData: `0x${string}` }>,
+): `0x${string}` {
+  return encodeAbiParameters(
+    [
+      {
+        type: "tuple[]",
+        components: [
+          { name: "target",   type: "address" },
+          { name: "value",    type: "uint256"  },
+          { name: "callData", type: "bytes"    },
+        ],
+      },
+    ],
+    [calls],
+  ) as `0x${string}`;
 }
 
 // Hardcoded ABI fragments for dashboard features that don't use full artifacts
